@@ -19,3 +19,7 @@ week11/
 week12/
 week13/
 week14/
+.bkit/
+
+# Git worktrees
+.worktrees/
