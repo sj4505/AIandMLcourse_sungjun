@@ -477,7 +477,7 @@
       const today        = new Date();
 
       function instCard(i) {
-        const pct     = Math.round((i.paidMonths / i.months) * 100);
+        const pct     = Math.min(100, Math.round((i.paidMonths / i.months) * 100));
         const lastOne = i.months - i.paidMonths === 1;
         const barColor = lastOne ? 'var(--red)' : 'var(--green)';
         return `
@@ -559,10 +559,10 @@
               class="w-full rounded-lg px-3 py-2 text-sm mb-2"
               style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
             <div class="flex gap-2 mb-2">
-              <input id="i-total" type="number" placeholder="총 금액"
+              <input id="i-total" type="number" placeholder="총 금액" min="1"
                 class="flex-1 rounded-lg px-3 py-2 text-sm mono"
                 style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
-              <input id="i-months" type="number" placeholder="개월"
+              <input id="i-months" type="number" placeholder="개월" min="1"
                 class="w-20 rounded-lg px-3 py-2 text-sm mono"
                 style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
             </div>
@@ -585,7 +585,7 @@
             <input id="l-name" placeholder="항목명 (예: 학자금 대출)"
               class="w-full rounded-lg px-3 py-2 text-sm mb-2"
               style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
-            <input id="l-balance" type="number" placeholder="잔여 금액"
+            <input id="l-balance" type="number" placeholder="잔여 금액" min="1"
               class="w-full rounded-lg px-3 py-2 text-sm mono mb-2"
               style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
             <label class="text-xs mb-1 block" style="color:var(--text2)">목표 상환일</label>
@@ -612,7 +612,7 @@
       const total  = parseInt(document.getElementById('i-total').value) || 0;
       const months = parseInt(document.getElementById('i-months').value) || 0;
       const start  = document.getElementById('i-start').value;
-      if (!name || !total || !months) { showToast('모든 항목을 입력하세요', 'warn'); return; }
+      if (!name || total <= 0 || months <= 0) { showToast('모든 항목을 입력하세요', 'warn'); return; }
 
       const list = db.installments();
       list.push({ id: genId(), name, totalAmount: total, months, paidMonths: 0, startDate: start, monthlyAmount: Math.round(total / months) });
@@ -624,8 +624,14 @@
     function markInstallmentPaid(id) {
       const list = db.installments();
       const item = list.find(i => i.id === id);
-      if (item && item.paidMonths < item.months) item.paidMonths++;
-      db.saveInstallments(list);
+      if (!item || item.paidMonths >= item.months) return;
+      item.paidMonths++;
+      if (item.paidMonths >= item.months) {
+        db.saveInstallments(list.filter(i => i.id !== id));
+        showToast(`${item.name} 완납 완료!`);
+      } else {
+        db.saveInstallments(list);
+      }
       renderInstallments();
     }
 
@@ -638,7 +644,7 @@
       const name    = document.getElementById('l-name').value.trim();
       const balance = parseInt(document.getElementById('l-balance').value) || 0;
       const target  = document.getElementById('l-target').value;
-      if (!name || !balance || !target) { showToast('모든 항목을 입력하세요', 'warn'); return; }
+      if (!name || balance <= 0 || !target) { showToast('모든 항목을 입력하세요', 'warn'); return; }
 
       const list = db.loans();
       list.push({ id: genId(), name, remainingBalance: balance, targetDate: target });
