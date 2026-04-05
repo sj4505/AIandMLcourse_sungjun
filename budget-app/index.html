@@ -202,10 +202,19 @@
       return Math.round(income - fixedTotal - loanReserve);
     }
 
-    function calcDailyBudget(disposable, today) {
+    function calcMonthSpent(expenses, today) {
+      const y = today.getFullYear(), m = today.getMonth() + 1;
+      const prefix = `${y}-${String(m).padStart(2,'0')}`;
+      return expenses
+        .filter(e => e.date && e.date.startsWith(prefix))
+        .reduce((s, e) => s + (e.myAmount ?? e.amount ?? 0), 0);
+    }
+
+    function calcDailyBudget(disposable, expenses, today) {
       const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
       const remaining = lastDay - today.getDate() + 1;
-      return Math.round(disposable / remaining);
+      const monthSpent = calcMonthSpent(expenses, today);
+      return Math.round((disposable - monthSpent) / remaining);
     }
 
     function calcTodaySpent(expenses, today) {
@@ -337,7 +346,7 @@
   const fixedTotal   = calcMonthlyFixed(fixedExp, installments);
   const loanReserve  = calcMonthlyLoanReserve(loans, today);
   const disposable   = Math.round(totalIncome - fixedTotal - loanReserve);
-  const dailyBudget  = calcDailyBudget(disposable, today);
+  const dailyBudget  = calcDailyBudget(disposable, expenses, today);
   const todaySpent   = calcTodaySpent(expenses, today);
   const remaining    = dailyBudget - todaySpent;
   const state        = getBudgetState(remaining, dailyBudget);
@@ -930,6 +939,7 @@
       const todaySpent = calcTodaySpent(db.expenses(), today);
       const dailyBudget = calcDailyBudget(
         calcDisposableIncome(db.settings(), db.work(), db.workLog(), db.fixed(), db.installments(), db.loans(), today),
+        db.expenses(),
         today
       );
 
