@@ -65,6 +65,70 @@
   </nav>
 
   <script>
+    // ── STORAGE ─────────────────────────────────────────────────────────
+    const KEYS = {
+      settings:     'budgetApp_settings',
+      work:         'budgetApp_work',
+      workLog:      'budgetApp_workLog',
+      fixed:        'budgetApp_fixed',
+      expenses:     'budgetApp_expenses',
+      installments: 'budgetApp_installments',
+      loans:        'budgetApp_loans',
+      categories:   'budgetApp_categories',
+    };
+
+    const DEFAULT_CATEGORIES = [
+      '식비','카페','편의점','교통','쇼핑','구독','의료','문화',
+      '자기관리','단백질음료','운동','사줌','기타'
+    ].map((name, i) => ({ id: i + 1, name, isDefault: true }));
+
+    const DEFAULT_DATA = {
+      [KEYS.settings]:     { allowance: 0, apiKey: '' },
+      [KEYS.work]:         { pattern: [], hourlyWage: 10030 },
+      [KEYS.workLog]:      [],
+      [KEYS.fixed]:        [],
+      [KEYS.expenses]:     [],
+      [KEYS.installments]: [],
+      [KEYS.loans]:        [],
+      [KEYS.categories]:   DEFAULT_CATEGORIES,
+    };
+
+    function store(key)        { return JSON.parse(localStorage.getItem(key) ?? 'null'); }
+    function save(key, val)    { localStorage.setItem(key, JSON.stringify(val)); }
+
+    function getOrDefault(key) {
+      const val = store(key);
+      return val !== null ? val : DEFAULT_DATA[key];
+    }
+
+    function initStorage() {
+      Object.keys(DEFAULT_DATA).forEach(key => {
+        if (store(key) === null) save(key, DEFAULT_DATA[key]);
+      });
+    }
+
+    const db = {
+      settings:     () => getOrDefault(KEYS.settings),
+      work:         () => getOrDefault(KEYS.work),
+      workLog:      () => getOrDefault(KEYS.workLog),
+      fixed:        () => getOrDefault(KEYS.fixed),
+      expenses:     () => getOrDefault(KEYS.expenses),
+      installments: () => getOrDefault(KEYS.installments),
+      loans:        () => getOrDefault(KEYS.loans),
+      categories:   () => getOrDefault(KEYS.categories),
+
+      saveSettings:     v => save(KEYS.settings, v),
+      saveWork:         v => save(KEYS.work, v),
+      saveWorkLog:      v => save(KEYS.workLog, v),
+      saveFixed:        v => save(KEYS.fixed, v),
+      saveExpenses:     v => save(KEYS.expenses, v),
+      saveInstallments: v => save(KEYS.installments, v),
+      saveLoans:        v => save(KEYS.loans, v),
+      saveCategories:   v => save(KEYS.categories, v),
+    };
+
+    function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
     // ── TAB NAVIGATION ──────────────────────────────────────────────
     let currentTab = 'home';
 
