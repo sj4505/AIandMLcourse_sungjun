@@ -395,7 +395,72 @@
 
     </div>`;
 }
-    function renderExpense()      { document.getElementById('tab-expense').innerHTML      = '<p class="text-sm" style="color:var(--text3)">지출 (구현 예정)</p>'; }
+    function renderExpense() {
+      const tab = document.getElementById('tab-expense');
+      _dutchOn = false;
+
+      tab.innerHTML = `
+        <div style="max-width:480px;margin:0 auto;">
+
+          <div class="mono text-[10px] uppercase tracking-widest mb-4" style="color:var(--text3)">지출 입력</div>
+
+          <div class="mb-4">
+            <label class="text-xs mb-1 block" style="color:var(--text2)">카드 결제 문자 붙여넣기</label>
+            <textarea id="sms-input" rows="4" placeholder="[신한카드] 승인 ₩15,900&#10;GS리테일(GS25) 01/15 14:32..."
+              class="w-full rounded-lg px-3 py-2 text-sm"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);resize:none;"></textarea>
+            <button id="btn-analyze" onclick="analyzeSMS()"
+              class="w-full mt-2 rounded-lg py-2.5 text-sm font-bold"
+              style="background:var(--green);color:#0f172a;">분석</button>
+          </div>
+
+          <div id="parsed-result"></div>
+
+          <div class="mt-4">
+            <button onclick="toggleManualForm()" class="text-xs" style="color:var(--text3);">직접 입력 →</button>
+            <div id="manual-form" class="hidden mt-3">
+              <div class="flex gap-2 mb-2">
+                <input id="m-amount" type="number" placeholder="금액"
+                  class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                  style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+                <select id="m-category" class="rounded-lg px-2 py-2 text-sm"
+                  style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+                  ${db.categories().map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+                </select>
+              </div>
+              <input id="m-merchant" placeholder="가맹점 / 내용"
+                class="w-full rounded-lg px-3 py-2 text-sm mb-2"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <input id="m-date" type="date" value="${formatDate(new Date())}"
+                class="w-full rounded-lg px-3 py-2 text-sm mono mb-2"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <button onclick="saveManualExpense()"
+                class="w-full rounded-lg py-2.5 text-sm font-bold"
+                style="background:var(--green);color:#0f172a;">저장</button>
+            </div>
+          </div>
+
+        </div>`;
+    }
+
+    function toggleManualForm() {
+      document.getElementById('manual-form').classList.toggle('hidden');
+    }
+
+    function saveManualExpense() {
+      const amount   = parseInt(document.getElementById('m-amount').value) || 0;
+      const category = document.getElementById('m-category').value;
+      const merchant = document.getElementById('m-merchant').value.trim() || '직접입력';
+      const date     = document.getElementById('m-date').value || formatDate(new Date());
+
+      if (!amount) { showToast('금액을 입력하세요', 'warn'); return; }
+
+      const expenses = db.expenses();
+      expenses.push({ id: genId(), date, amount, myAmount: amount, merchant, category, memo: '', source: 'manual', isDutch: false, splitCount: 1 });
+      db.saveExpenses(expenses);
+      showToast('지출 저장됨');
+      switchTab('home');
+    }
     function renderInstallments() { document.getElementById('tab-installments').innerHTML = '<p class="text-sm" style="color:var(--text3)">할부 (구현 예정)</p>'; }
     function renderSettings() {
       const tab = document.getElementById('tab-settings');
@@ -614,6 +679,158 @@
       settings.apiKey = document.getElementById('inp-apikey').value.trim();
       db.saveSettings(settings);
       showToast('API 키 저장됨');
+    }
+
+    // ── EVENTS — 지출 탭 ─────────────────────────────────────────────────
+
+    async function callOpenAI(systemPrompt, userPrompt) {
+      const key = db.settings().apiKey;
+      if (!key) { showToast('설정에서 API 키를 입력해주세요', 'warn'); return null; }
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user',   content: userPrompt   },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0,
+        }),
+      });
+
+      if (!res.ok) { showToast(`API 오류: ${res.status}`, 'warn'); return null; }
+      const data = await res.json();
+      return JSON.parse(data.choices[0].message.content);
+    }
+
+    async function analyzeSMS() {
+      const smsText = document.getElementById('sms-input').value.trim();
+      if (!smsText) { showToast('문자를 붙여넣어 주세요', 'warn'); return; }
+
+      const btn = document.getElementById('btn-analyze');
+      btn.textContent = '분석 중...';
+      btn.disabled = true;
+
+      const cats = db.categories().map(c => c.name).join(', ');
+      const today = new Date();
+      const todaySpent = calcTodaySpent(db.expenses(), today);
+      const dailyBudget = calcDailyBudget(
+        calcDisposableIncome(db.settings(), db.work(), db.workLog(), db.fixed(), db.installments(), db.loans(), today),
+        today
+      );
+
+      const systemPrompt = `한국 카드사 SMS에서 결제 정보를 추출해 JSON으로 반환하라.
+카테고리는 반드시 다음 중 하나: ${cats}
+JSON 형식: { "amount": number, "merchant": string, "category": string, "date": "YYYY-MM-DD", "feedback": string }
+feedback은 오늘 예산 상황을 포함한 1문장 한국어 코멘트. 절약 조언이나 격려 포함.`;
+
+      const userPrompt = `SMS:\n${smsText}\n\n오늘 날짜: ${formatDate(today)}\n일일예산: ${dailyBudget}원\n오늘 지출합계: ${todaySpent}원`;
+
+      const result = await callOpenAI(systemPrompt, userPrompt);
+
+      btn.textContent = '분석';
+      btn.disabled = false;
+
+      if (!result) return;
+
+      window._parsedExpense = result;
+
+      document.getElementById('parsed-result').innerHTML = `
+        <div class="rounded-lg p-3 mb-3" style="background:var(--bg2);border:1px solid var(--border);">
+          <div class="flex justify-between py-1"><span class="text-xs" style="color:var(--text3)">금액</span>
+            <span class="mono font-bold" style="color:var(--green);">${formatKRW(result.amount)}</span></div>
+          <div class="flex justify-between py-1"><span class="text-xs" style="color:var(--text3)">가맹점</span>
+            <span class="text-sm">${result.merchant}</span></div>
+          <div class="flex justify-between py-1"><span class="text-xs" style="color:var(--text3)">카테고리</span>
+            <select id="sel-category" class="text-xs rounded px-2 py-0.5 mono"
+              style="background:var(--border);color:var(--text);border:none;">
+              ${db.categories().map(c => `<option value="${c.name}" ${c.name===result.category?'selected':''}>${c.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="flex justify-between py-1"><span class="text-xs" style="color:var(--text3)">날짜</span>
+            <input type="date" id="inp-date" value="${result.date}"
+              class="text-xs mono rounded px-2 py-0.5"
+              style="background:var(--border);color:var(--text);border:none;"></div>
+        </div>
+        <div class="rounded-lg px-3 py-2 mb-3 text-xs" style="background:#0d2a1f;border:1px solid #065f46;color:var(--green);">
+          ✦ ${result.feedback}
+        </div>
+        <div class="rounded-lg p-3 mb-3" style="background:var(--bg2);border:1px solid var(--border);">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm">더치페이</span>
+            <button id="btn-dutch" onclick="toggleDutch()"
+              class="rounded-full px-3 py-1 text-xs mono"
+              style="background:var(--border);color:var(--text3);">OFF</button>
+          </div>
+          <div id="dutch-detail" class="hidden">
+            <div class="flex items-center gap-2">
+              <span class="text-xs" style="color:var(--text2)">인원 수 (나 포함)</span>
+              <input type="number" id="inp-split" value="2" min="2" max="10"
+                class="w-16 rounded px-2 py-1 text-xs mono"
+                style="background:var(--bg);border:1px solid var(--border);color:var(--text);"
+                oninput="updateDutchCalc()">
+              <span class="text-xs" style="color:var(--text3)">명</span>
+            </div>
+            <div class="mt-2 text-xs mono" style="color:var(--green);" id="dutch-my-amount"></div>
+          </div>
+        </div>
+        <button onclick="saveExpense()"
+          class="w-full rounded-lg py-2.5 text-sm font-bold"
+          style="background:var(--green);color:#0f172a;">저장</button>`;
+    }
+
+    let _dutchOn = false;
+    function toggleDutch() {
+      _dutchOn = !_dutchOn;
+      const btn = document.getElementById('btn-dutch');
+      const detail = document.getElementById('dutch-detail');
+      btn.textContent = _dutchOn ? 'ON' : 'OFF';
+      btn.style.background = _dutchOn ? 'var(--green)' : 'var(--border)';
+      btn.style.color = _dutchOn ? '#0f172a' : 'var(--text3)';
+      detail.classList.toggle('hidden', !_dutchOn);
+      if (_dutchOn) updateDutchCalc();
+    }
+
+    function updateDutchCalc() {
+      const split = parseInt(document.getElementById('inp-split')?.value) || 2;
+      const amount = window._parsedExpense?.amount || 0;
+      const myAmt = Math.round(amount / split);
+      const elem = document.getElementById('dutch-my-amount');
+      if (elem) elem.textContent = `내 부담: ${formatKRW(myAmt)} (${formatKRW(amount)} ÷ ${split})`;
+    }
+
+    function saveExpense() {
+      const parsed = window._parsedExpense;
+      if (!parsed) return;
+
+      const amount   = parsed.amount;
+      const split    = _dutchOn ? (parseInt(document.getElementById('inp-split').value) || 2) : 1;
+      const myAmount = Math.round(amount / split);
+
+      const expense = {
+        id:         genId(),
+        date:       document.getElementById('inp-date').value || formatDate(new Date()),
+        amount,
+        myAmount,
+        merchant:   parsed.merchant,
+        category:   document.getElementById('sel-category').value,
+        memo:       '',
+        source:     'sms',
+        isDutch:    _dutchOn,
+        splitCount: split,
+      };
+
+      const expenses = db.expenses();
+      expenses.push(expense);
+      db.saveExpenses(expenses);
+
+      window._parsedExpense = null;
+      _dutchOn = false;
+      showToast('지출 저장됨');
+      switchTab('home');
     }
 
     initStorage();
