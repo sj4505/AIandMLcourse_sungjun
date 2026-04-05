@@ -470,7 +470,200 @@
       showToast('지출 저장됨');
       switchTab('home');
     }
-    function renderInstallments() { document.getElementById('tab-installments').innerHTML = '<p class="text-sm" style="color:var(--text3)">할부 (구현 예정)</p>'; }
+    function renderInstallments() {
+      const tab          = document.getElementById('tab-installments');
+      const installments = db.installments();
+      const loans        = db.loans();
+      const today        = new Date();
+
+      function instCard(i) {
+        const pct     = Math.round((i.paidMonths / i.months) * 100);
+        const lastOne = i.months - i.paidMonths === 1;
+        const barColor = lastOne ? 'var(--red)' : 'var(--green)';
+        return `
+          <div class="rounded-xl p-4 mb-3" style="background:var(--bg2);border:1px solid ${lastOne ? 'var(--red)' : 'var(--border)'};">
+            <div class="flex justify-between items-start mb-2">
+              <span class="text-sm font-medium">${escapeHtml(i.name)}</span>
+              <div class="flex gap-1 items-center">
+                ${lastOne ? `<span class="text-[9px] mono px-2 py-0.5 rounded" style="background:#2d1515;color:var(--red);">⚠ 마지막달</span>` : ''}
+                <span class="text-[9px] mono px-2 py-0.5 rounded" style="background:var(--border);color:var(--text3);">${i.paidMonths}/${i.months}개월</span>
+              </div>
+            </div>
+            <div class="rounded-full overflow-hidden mb-2" style="height:2px;background:var(--border);">
+              <div style="height:100%;width:${pct}%;background:${barColor};"></div>
+            </div>
+            <div class="flex justify-between text-xs mono">
+              <span style="color:var(--text2)">월 ${formatKRW(i.monthlyAmount)}</span>
+              <span style="color:var(--text3)">잔여 ${formatKRW(i.monthlyAmount * (i.months - i.paidMonths))}</span>
+            </div>
+            <div class="flex gap-2 mt-3">
+              <button onclick="markInstallmentPaid('${i.id}')"
+                class="flex-1 rounded-lg py-1.5 text-xs font-bold"
+                style="background:var(--green);color:#0f172a;">이번달 납부 완료</button>
+              <button onclick="deleteInstallment('${i.id}')"
+                class="px-3 rounded-lg text-xs"
+                style="background:var(--border);color:var(--text3);">삭제</button>
+            </div>
+          </div>`;
+      }
+
+      function loanCard(l) {
+        const daysLeft    = calcDaysLeft(l.targetDate, today);
+        const dailyAmount = l.remainingBalance / Math.max(1, daysLeft);
+        return `
+          <div class="rounded-xl p-4 mb-3" style="background:var(--bg2);border:1px solid var(--border);">
+            <div class="flex justify-between items-start mb-2">
+              <span class="text-sm font-medium">${escapeHtml(l.name)}</span>
+              <span class="text-[9px] mono px-2 py-0.5 rounded" style="background:#1c1917;color:var(--amber);">D-${daysLeft}</span>
+            </div>
+            <div class="flex justify-between text-xs mono">
+              <span style="color:var(--text2)">일 ${formatKRW(Math.round(dailyAmount))} 적립</span>
+              <span style="color:var(--text3)">잔여 ${formatKRW(l.remainingBalance)}</span>
+            </div>
+            <div class="flex gap-2 mt-3">
+              <button onclick="openUpdateLoan('${l.id}')"
+                class="flex-1 rounded-lg py-1.5 text-xs"
+                style="background:var(--border);color:var(--text2);">잔액 수정</button>
+              <button onclick="deleteLoan('${l.id}')"
+                class="px-3 rounded-lg text-xs"
+                style="background:var(--border);color:var(--text3);">삭제</button>
+            </div>
+          </div>`;
+      }
+
+      tab.innerHTML = `
+        <div style="max-width:480px;margin:0 auto;">
+
+          <!-- 할부 섹션 -->
+          <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">할부</div>
+          ${installments.length ? installments.map(instCard).join('') : '<p class="text-xs mb-4" style="color:var(--text3)">할부 없음</p>'}
+          <button onclick="openAddInstallment()"
+            class="w-full rounded-lg py-2 text-sm mb-6"
+            style="background:var(--bg2);border:1px solid var(--border);color:var(--text2);">+ 할부 추가</button>
+
+          <!-- 대출 섹션 -->
+          <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">대출</div>
+          ${loans.length ? loans.map(loanCard).join('') : '<p class="text-xs mb-4" style="color:var(--text3)">대출 없음</p>'}
+          <button onclick="openAddLoan()"
+            class="w-full rounded-lg py-2 text-sm mb-6"
+            style="background:var(--bg2);border:1px solid var(--border);color:var(--text2);">+ 대출 추가</button>
+
+        </div>
+
+        <!-- 할부 추가 모달 -->
+        <div id="modal-installment" class="hidden fixed inset-0 z-50 flex items-end justify-center"
+          style="background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);">
+          <div class="w-full rounded-t-2xl p-5" style="background:#0d1829;max-width:480px;">
+            <div class="text-sm font-bold mb-4">할부 추가</div>
+            <input id="i-name" placeholder="항목명 (예: 에어팟 프로)"
+              class="w-full rounded-lg px-3 py-2 text-sm mb-2"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            <div class="flex gap-2 mb-2">
+              <input id="i-total" type="number" placeholder="총 금액"
+                class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <input id="i-months" type="number" placeholder="개월"
+                class="w-20 rounded-lg px-3 py-2 text-sm mono"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            </div>
+            <input id="i-start" type="month" value="${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}"
+              class="w-full rounded-lg px-3 py-2 text-sm mono mb-3"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            <button onclick="saveInstallment()"
+              class="w-full rounded-lg py-2.5 text-sm font-bold mb-2"
+              style="background:var(--green);color:#0f172a;">추가</button>
+            <button onclick="closeModal('modal-installment')"
+              class="w-full rounded-lg py-2 text-sm" style="color:var(--text3);">취소</button>
+          </div>
+        </div>
+
+        <!-- 대출 추가 모달 -->
+        <div id="modal-loan" class="hidden fixed inset-0 z-50 flex items-end justify-center"
+          style="background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);">
+          <div class="w-full rounded-t-2xl p-5" style="background:#0d1829;max-width:480px;">
+            <div class="text-sm font-bold mb-4">대출 추가</div>
+            <input id="l-name" placeholder="항목명 (예: 학자금 대출)"
+              class="w-full rounded-lg px-3 py-2 text-sm mb-2"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            <input id="l-balance" type="number" placeholder="잔여 금액"
+              class="w-full rounded-lg px-3 py-2 text-sm mono mb-2"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            <label class="text-xs mb-1 block" style="color:var(--text2)">목표 상환일</label>
+            <input id="l-target" type="date"
+              class="w-full rounded-lg px-3 py-2 text-sm mono mb-3"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            <button onclick="saveLoan()"
+              class="w-full rounded-lg py-2.5 text-sm font-bold mb-2"
+              style="background:var(--green);color:#0f172a;">추가</button>
+            <button onclick="closeModal('modal-loan')"
+              class="w-full rounded-lg py-2 text-sm" style="color:var(--text3);">취소</button>
+          </div>
+        </div>`;
+    }
+
+    // ── EVENTS — 할부/대출 탭 ─────────────────────────────────────────────
+
+    function openAddInstallment() { document.getElementById('modal-installment').classList.remove('hidden'); }
+    function openAddLoan()        { document.getElementById('modal-loan').classList.remove('hidden'); }
+    function closeModal(id)       { document.getElementById(id).classList.add('hidden'); }
+
+    function saveInstallment() {
+      const name   = document.getElementById('i-name').value.trim();
+      const total  = parseInt(document.getElementById('i-total').value) || 0;
+      const months = parseInt(document.getElementById('i-months').value) || 0;
+      const start  = document.getElementById('i-start').value;
+      if (!name || !total || !months) { showToast('모든 항목을 입력하세요', 'warn'); return; }
+
+      const list = db.installments();
+      list.push({ id: genId(), name, totalAmount: total, months, paidMonths: 0, startDate: start, monthlyAmount: Math.round(total / months) });
+      db.saveInstallments(list);
+      closeModal('modal-installment');
+      renderInstallments();
+    }
+
+    function markInstallmentPaid(id) {
+      const list = db.installments();
+      const item = list.find(i => i.id === id);
+      if (item && item.paidMonths < item.months) item.paidMonths++;
+      db.saveInstallments(list);
+      renderInstallments();
+    }
+
+    function deleteInstallment(id) {
+      db.saveInstallments(db.installments().filter(i => i.id !== id));
+      renderInstallments();
+    }
+
+    function saveLoan() {
+      const name    = document.getElementById('l-name').value.trim();
+      const balance = parseInt(document.getElementById('l-balance').value) || 0;
+      const target  = document.getElementById('l-target').value;
+      if (!name || !balance || !target) { showToast('모든 항목을 입력하세요', 'warn'); return; }
+
+      const list = db.loans();
+      list.push({ id: genId(), name, remainingBalance: balance, targetDate: target });
+      db.saveLoans(list);
+      closeModal('modal-loan');
+      renderInstallments();
+    }
+
+    function openUpdateLoan(id) {
+      const loan = db.loans().find(l => l.id === id);
+      if (!loan) return;
+      const newBal = prompt(`${loan.name} 잔여 금액 수정 (현재: ${loan.remainingBalance.toLocaleString()}원):`);
+      if (newBal === null) return;
+      const val = parseInt(newBal);
+      if (isNaN(val) || val < 0) { showToast('올바른 금액을 입력하세요', 'warn'); return; }
+      loan.remainingBalance = val;
+      db.saveLoans(db.loans().map(l => l.id === id ? loan : l));
+      renderInstallments();
+    }
+
+    function deleteLoan(id) {
+      db.saveLoans(db.loans().filter(l => l.id !== id));
+      renderInstallments();
+    }
+
     function renderSettings() {
       const tab = document.getElementById('tab-settings');
       const settings = db.settings();
