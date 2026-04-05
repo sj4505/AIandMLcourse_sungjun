@@ -239,6 +239,42 @@
       return Math.max(0, Math.round((t - n) / 86400000));
     }
 
+    // ── UI HELPERS ────────────────────────────────────────────────────────
+
+    function el(tag, attrs = {}, ...children) {
+      const elem = document.createElement(tag);
+      Object.entries(attrs).forEach(([k, v]) => {
+        if (k === 'class') elem.className = v;
+        else if (k === 'style') elem.style.cssText = v;
+        else if (k.startsWith('on')) elem.addEventListener(k.slice(2), v);
+        else elem.setAttribute(k, v);
+      });
+      children.forEach(c => {
+        if (c == null) return;
+        elem.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+      });
+      return elem;
+    }
+
+    function setHTML(id, html) { document.getElementById(id).innerHTML = html; }
+
+    const DAYS = ['일','월','화','수','목','금','토'];
+
+    function showToast(msg, type = 'info') {
+      const existing = document.getElementById('toast');
+      if (existing) existing.remove();
+      const toast = el('div', {
+        id: 'toast',
+        style: `position:fixed;bottom:72px;left:50%;transform:translateX(-50%);
+                background:${type==='warn'?'#7f1d1d':'#0d2a1f'};
+                color:${type==='warn'?'#fca5a5':'#6ee7b7'};
+                padding:8px 16px;border-radius:8px;font-size:13px;
+                font-family:monospace;z-index:999;white-space:nowrap;`
+      }, msg);
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2000);
+    }
+
     // ── TAB NAVIGATION ──────────────────────────────────────────────
     let currentTab = 'home';
 
@@ -263,7 +299,224 @@
     function renderHome()         { document.getElementById('tab-home').innerHTML         = '<p class="text-sm" style="color:var(--text3)">홈 (구현 예정)</p>'; }
     function renderExpense()      { document.getElementById('tab-expense').innerHTML      = '<p class="text-sm" style="color:var(--text3)">지출 (구현 예정)</p>'; }
     function renderInstallments() { document.getElementById('tab-installments').innerHTML = '<p class="text-sm" style="color:var(--text3)">할부 (구현 예정)</p>'; }
-    function renderSettings()     { document.getElementById('tab-settings').innerHTML     = '<p class="text-sm" style="color:var(--text3)">설정 (구현 예정)</p>'; }
+    function renderSettings() {
+      const tab = document.getElementById('tab-settings');
+      const settings = db.settings();
+      const work     = db.work();
+      const workLog  = db.workLog();
+      const fixed    = db.fixed();
+      const cats     = db.categories();
+
+      const thisWeek    = getWeekKey(new Date());
+      const weekLogEntry = workLog.find(l => l.weekKey === thisWeek);
+      const baseHours   = work.pattern.reduce((s, p) => s + p.hours, 0);
+      const actualHours = weekLogEntry ? weekLogEntry.actualHours : baseHours;
+
+      tab.innerHTML = `
+        <div style="max-width:480px;margin:0 auto;">
+
+          <div class="mb-6">
+            <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">수입</div>
+
+            <label class="block mb-3">
+              <span class="text-xs mb-1 block" style="color:var(--text2)">용돈 (월)</span>
+              <div class="flex gap-2">
+                <input id="inp-allowance" type="number" value="${settings.allowance}"
+                  class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                  style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+                <span class="flex items-center text-xs" style="color:var(--text3)">원</span>
+              </div>
+            </label>
+
+            <label class="block mb-3">
+              <span class="text-xs mb-1 block" style="color:var(--text2)">시급</span>
+              <div class="flex gap-2">
+                <input id="inp-wage" type="number" value="${work.hourlyWage}"
+                  class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                  style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+                <span class="flex items-center text-xs" style="color:var(--text3)">원</span>
+              </div>
+            </label>
+
+            <div class="mb-2">
+              <span class="text-xs mb-2 block" style="color:var(--text2)">알바 요일 & 시간</span>
+              <div class="flex gap-1 mb-2">
+                ${DAYS.map((d, i) => {
+                  const pat = work.pattern.find(p => p.day === i);
+                  return `<button class="day-btn flex-1 rounded py-1.5 text-xs mono"
+                    data-day="${i}"
+                    style="background:${pat?'var(--green)':'var(--bg2)'};
+                           color:${pat?'#0f172a':'var(--text3)'};
+                           border:1px solid ${pat?'var(--green)':'var(--border)'}"
+                    onclick="toggleDay(${i})">${d}</button>`;
+                }).join('')}
+              </div>
+              <div id="day-hours-inputs">
+                ${work.pattern.map(p => `
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs mono w-4" style="color:var(--text2)">${DAYS[p.day]}</span>
+                    <input type="number" value="${p.hours}" min="1" max="24"
+                      class="w-16 rounded px-2 py-1 text-xs mono"
+                      style="background:var(--bg2);border:1px solid var(--border);color:var(--text);"
+                      onchange="updateDayHours(${p.day}, this.value)">
+                    <span class="text-xs" style="color:var(--text3)">시간</span>
+                  </div>`).join('')}
+              </div>
+            </div>
+
+            <label class="block mb-3">
+              <span class="text-xs mb-1 block" style="color:var(--text2)">이번 주 실제 근무시간 (기본 ${baseHours}h)</span>
+              <div class="flex gap-2">
+                <input id="inp-actual-hours" type="number" value="${actualHours}" step="0.5"
+                  class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                  style="background:${actualHours !== baseHours ? 'rgba(52,211,153,0.05)' : 'var(--bg2)'};
+                         border:1px solid ${actualHours !== baseHours ? 'var(--green)' : 'var(--border)'};
+                         color:var(--text);">
+                <span class="flex items-center text-xs" style="color:var(--text3)">시간</span>
+              </div>
+            </label>
+
+            <button onclick="saveIncomeSettings()"
+              class="w-full rounded-lg py-2 text-sm font-bold"
+              style="background:var(--green);color:#0f172a;">수입 설정 저장</button>
+          </div>
+
+          <div class="mb-6">
+            <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">고정 지출</div>
+            <div id="fixed-list">
+              ${fixed.map(f => `
+                <div class="flex items-center gap-2 mb-2 rounded-lg px-3 py-2"
+                  style="background:var(--bg2);border:1px solid var(--border);">
+                  <span class="flex-1 text-sm">${f.name}</span>
+                  <span class="mono text-sm" style="color:var(--text2)">${formatKRW(f.amount)}</span>
+                  <button onclick="deleteFixed('${f.id}')" class="text-xs" style="color:var(--text3)">✕</button>
+                </div>`).join('') || '<p class="text-xs mb-2" style="color:var(--text3)">없음</p>'}
+            </div>
+            <div class="flex gap-2">
+              <input id="inp-fixed-name" placeholder="항목명" class="flex-1 rounded-lg px-3 py-2 text-sm"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <input id="inp-fixed-amount" type="number" placeholder="금액" class="w-24 rounded-lg px-3 py-2 text-sm mono"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <button onclick="addFixed()"
+                class="px-3 rounded-lg text-sm font-bold"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--green);">+</button>
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">카테고리</div>
+            <div class="flex flex-wrap gap-2 mb-3">
+              ${cats.map(c => `
+                <span class="flex items-center gap-1 rounded-full px-3 py-1 text-xs mono"
+                  style="background:var(--bg2);border:1px solid var(--border);color:var(--text2);">
+                  ${c.name}
+                  ${!c.isDefault ? `<button onclick="deleteCategory(${c.id})" style="color:var(--text3);">✕</button>` : ''}
+                </span>`).join('')}
+            </div>
+            <div class="flex gap-2">
+              <input id="inp-cat-name" placeholder="새 카테고리" class="flex-1 rounded-lg px-3 py-2 text-sm"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <button onclick="addCategory()"
+                class="px-3 rounded-lg text-sm font-bold"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--green);">추가</button>
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">OpenAI API</div>
+            <div class="flex gap-2">
+              <input id="inp-apikey" type="password" value="${settings.apiKey}"
+                placeholder="sk-..."
+                class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <button onclick="saveApiKey()"
+                class="px-3 rounded-lg text-sm font-bold"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--green);">저장</button>
+            </div>
+            <p class="text-xs mt-1" style="color:var(--text3)">이 기기 localStorage에만 저장됩니다.</p>
+          </div>
+
+        </div>`;
+    }
+
+    // ── EVENTS — 설정 탭 ─────────────────────────────────────────────────
+
+    function toggleDay(dayIdx) {
+      const work = db.work();
+      const exists = work.pattern.findIndex(p => p.day === dayIdx);
+      if (exists >= 0) work.pattern.splice(exists, 1);
+      else work.pattern.push({ day: dayIdx, hours: 5 });
+      work.pattern.sort((a, b) => a.day - b.day);
+      db.saveWork(work);
+      renderSettings();
+    }
+
+    function updateDayHours(dayIdx, val) {
+      const work = db.work();
+      const pat = work.pattern.find(p => p.day === dayIdx);
+      if (pat) pat.hours = parseFloat(val) || 0;
+      db.saveWork(work);
+    }
+
+    function saveIncomeSettings() {
+      const settings = db.settings();
+      settings.allowance = parseInt(document.getElementById('inp-allowance').value) || 0;
+      db.saveSettings(settings);
+
+      const work = db.work();
+      work.hourlyWage = parseInt(document.getElementById('inp-wage').value) || 0;
+      db.saveWork(work);
+
+      const thisWeek = getWeekKey(new Date());
+      const workLog = db.workLog();
+      const actualHours = parseFloat(document.getElementById('inp-actual-hours').value) || 0;
+      const idx = workLog.findIndex(l => l.weekKey === thisWeek);
+      if (idx >= 0) workLog[idx].actualHours = actualHours;
+      else workLog.push({ weekKey: thisWeek, actualHours });
+      db.saveWorkLog(workLog);
+
+      showToast('수입 설정 저장됨');
+      if (currentTab === 'home') renderHome();
+    }
+
+    function deleteFixed(id) {
+      db.saveFixed(db.fixed().filter(f => f.id !== id));
+      renderSettings();
+      if (currentTab === 'home') renderHome();
+    }
+
+    function addFixed() {
+      const name   = document.getElementById('inp-fixed-name').value.trim();
+      const amount = parseInt(document.getElementById('inp-fixed-amount').value) || 0;
+      if (!name || !amount) { showToast('항목명과 금액을 입력하세요', 'warn'); return; }
+      const fixed = db.fixed();
+      fixed.push({ id: genId(), name, amount });
+      db.saveFixed(fixed);
+      renderSettings();
+      if (currentTab === 'home') renderHome();
+    }
+
+    function addCategory() {
+      const name = document.getElementById('inp-cat-name').value.trim();
+      if (!name) return;
+      const cats = db.categories();
+      if (cats.find(c => c.name === name)) { showToast('이미 있는 카테고리입니다', 'warn'); return; }
+      cats.push({ id: genId(), name, isDefault: false });
+      db.saveCategories(cats);
+      renderSettings();
+    }
+
+    function deleteCategory(id) {
+      db.saveCategories(db.categories().filter(c => c.id !== id));
+      renderSettings();
+    }
+
+    function saveApiKey() {
+      const settings = db.settings();
+      settings.apiKey = document.getElementById('inp-apikey').value.trim();
+      db.saveSettings(settings);
+      showToast('API 키 저장됨');
+    }
 
     initStorage();
     switchTab('home');
