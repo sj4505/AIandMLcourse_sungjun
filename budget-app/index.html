@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>가계부</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #0f172a;
+      --bg2:      #0a1120;
+      --border:   #1e293b;
+      --text:     #f1f5f9;
+      --text2:    #94a3b8;
+      --text3:    #475569;
+      --green:    #34d399;
+      --amber:    #fbbf24;
+      --red:      #f87171;
+      --red2:     #ef4444;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      min-height: 100dvh;
+      overscroll-behavior: none;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .color-good   { color: var(--green); }
+    .color-warn   { color: var(--amber); }
+    .color-danger { color: var(--red);   }
+    .color-over   { color: var(--red2);  }
+  </style>
+</head>
+<body class="flex flex-col" style="min-height:100dvh;">
+
+  <main id="main" class="flex-1 overflow-y-auto pb-16" style="-webkit-overflow-scrolling:touch;">
+    <div id="tab-home"         class="tab-content active p-4"></div>
+    <div id="tab-expense"      class="tab-content p-4"></div>
+    <div id="tab-installments" class="tab-content p-4"></div>
+    <div id="tab-settings"     class="tab-content p-4"></div>
+  </main>
+
+  <nav class="fixed bottom-0 left-0 right-0 flex border-t" style="background:#080f1e; border-color:var(--border); height:56px;">
+    <button class="tab-btn flex-1 flex flex-col items-center justify-center gap-0.5" data-tab="home"         onclick="switchTab('home')">
+      <span class="text-lg">🏠</span>
+      <span class="text-[9px] mono uppercase tracking-wide tab-btn-label">홈</span>
+    </button>
+    <button class="tab-btn flex-1 flex flex-col items-center justify-center gap-0.5" data-tab="expense"      onclick="switchTab('expense')">
+      <span class="text-lg">➕</span>
+      <span class="text-[9px] mono uppercase tracking-wide tab-btn-label">지출</span>
+    </button>
+    <button class="tab-btn flex-1 flex flex-col items-center justify-center gap-0.5" data-tab="installments" onclick="switchTab('installments')">
+      <span class="text-lg">💳</span>
+      <span class="text-[9px] mono uppercase tracking-wide tab-btn-label">할부</span>
+    </button>
+    <button class="tab-btn flex-1 flex flex-col items-center justify-center gap-0.5" data-tab="settings"     onclick="switchTab('settings')">
+      <span class="text-lg">⚙️</span>
+      <span class="text-[9px] mono uppercase tracking-wide tab-btn-label">설정</span>
+    </button>
+  </nav>
+
+  <script>
+    // ── TAB NAVIGATION ──────────────────────────────────────────────
+    let currentTab = 'home';
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        const isActive = btn.dataset.tab === name;
+        btn.querySelector('.tab-btn-label').style.color = isActive ? 'var(--green)' : 'var(--text3)';
+      });
+      currentTab = name;
+      renderTab(name);
+    }
+
+    function renderTab(name) {
+      if (name === 'home')         renderHome();
+      if (name === 'expense')      renderExpense();
+      if (name === 'installments') renderInstallments();
+      if (name === 'settings')     renderSettings();
+    }
+
+    function renderHome()         { document.getElementById('tab-home').innerHTML         = '<p class="text-sm" style="color:var(--text3)">홈 (구현 예정)</p>'; }
+    function renderExpense()      { document.getElementById('tab-expense').innerHTML      = '<p class="text-sm" style="color:var(--text3)">지출 (구현 예정)</p>'; }
+    function renderInstallments() { document.getElementById('tab-installments').innerHTML = '<p class="text-sm" style="color:var(--text3)">할부 (구현 예정)</p>'; }
+    function renderSettings()     { document.getElementById('tab-settings').innerHTML     = '<p class="text-sm" style="color:var(--text3)">설정 (구현 예정)</p>'; }
+
+    initStorage();
+    switchTab('home');
+  </script>
+</body>
+</html>
