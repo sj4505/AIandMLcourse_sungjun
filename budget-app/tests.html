@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>계산 엔진 단위 테스트</title>
+  <style>
+    body { font-family: monospace; background: #0f172a; color: #e2e8f0; padding: 24px; }
+    .pass { color: #34d399; } .fail { color: #f87171; }
+    h2 { color: #94a3b8; font-size: 13px; margin: 20px 0 8px; }
+  </style>
+</head>
+<body>
+<h1 style="font-size:16px; margin-bottom:16px;">가계부 계산 엔진 테스트</h1>
+<div id="results"></div>
+<script>
+function countWeekdayInMonth(year, month, day) {
+  let count = 0;
+  const date = new Date(year, month - 1, 1);
+  while (date.getMonth() === month - 1) {
+    if (date.getDay() === day) count++;
+    date.setDate(date.getDate() + 1);
+  }
+  return count;
+}
+
+function getWeekKey(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const week1 = new Date(d.getFullYear(), 0, 4);
+  const wn = 1 + Math.round(((d - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+  return `${d.getFullYear()}-W${String(wn).padStart(2, '0')}`;
+}
+
+function calcMonthlyWorkIncome(work, workLog, year, month) {
+  const { pattern, hourlyWage } = work;
+  if (!pattern.length || !hourlyWage) return 0;
+  const baseWeeklyHours = pattern.reduce((s, p) => s + p.hours, 0);
+  const weekTotals = {};
+  const date = new Date(year, month - 1, 1);
+  while (date.getMonth() === month - 1) {
+    const wk = getWeekKey(date);
+    if (!weekTotals[wk]) {
+      const log = workLog.find(l => l.weekKey === wk);
+      weekTotals[wk] = log ? log.actualHours : baseWeeklyHours;
+    }
+    date.setDate(date.getDate() + 1);
+  }
+  const totalHours = Object.values(weekTotals).reduce((s, h) => s + h, 0);
+  return Math.round(totalHours * hourlyWage);
+}
+
+function calcMonthlyFixed(fixedExpenses, installments) {
+  const fixed = fixedExpenses.reduce((s, f) => s + (f.amount || 0), 0);
+  const inst  = installments.filter(i => i.paidMonths < i.months).reduce((s, i) => s + (i.monthlyAmount || 0), 0);
+  return fixed + inst;
+}
+
+function calcMonthlyLoanReserve(loans, today) {
+  const todayMs = new Date(today).setHours(0, 0, 0, 0);
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const remainingDaysInMonth = lastDay.getDate() - today.getDate() + 1;
+  return loans.reduce((sum, loan) => {
+    if (!loan.remainingBalance || !loan.targetDate) return sum;
+    const targetMs = new Date(loan.targetDate).setHours(0, 0, 0, 0);
+    const daysLeft = Math.max(1, Math.round((targetMs - todayMs) / 86400000));
+    const dailyReserve = loan.remainingBalance / daysLeft;
+    return sum + dailyReserve * remainingDaysInMonth;
+  }, 0);
+}
+
+function calcDailyBudget(disposable, today) {
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const remaining = lastDay - today.getDate() + 1;
+  return Math.round(disposable / remaining);
+}
+
+function getBudgetState(remaining, dailyBudget) {
+  if (remaining < 0)                         return 'over';
+  if (remaining / dailyBudget < 0.2)         return 'danger';
+  if (remaining / dailyBudget < 0.5)         return 'warn';
+  return 'good';
+}
+
+function formatDate(date) {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+let passed = 0, failed = 0;
+const out = document.getElementById('results');
+
+function assert(desc, actual, expected) {
+  const ok = JSON.stringify(actual) === JSON.stringify(expected);
+  if (ok) passed++; else failed++;
+  out.innerHTML += `<div class="${ok?'pass':'fail'}">${ok?'✓':'✗'} ${desc}${ok?'':` — got ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`}</div>`;
+}
+
+out.innerHTML += '<h2>countWeekdayInMonth</h2>';
+assert('2026-04 화요일 4번', countWeekdayInMonth(2026, 4, 2), 4);
+assert('2026-04 수요일 5번', countWeekdayInMonth(2026, 4, 3), 5);
+
+out.innerHTML += '<h2>calcMonthlyWorkIncome</h2>';
+const work = { pattern: [{ day: 2, hours: 5 }, { day: 4, hours: 5 }, { day: 6, hours: 5 }], hourlyWage: 10000 };
+const income = calcMonthlyWorkIncome(work, [], 2026, 4);
+assert('알바 수입 > 0', income > 0, true);
+assert('알바 수입 < 1000000', income < 1000000, true);
+
+out.innerHTML += '<h2>calcMonthlyFixed</h2>';
+const fixed = [{ amount: 55000 }, { amount: 30000 }];
+const inst  = [{ monthlyAmount: 29000, paidMonths: 2, months: 12 }];
+assert('고정 지출 합산', calcMonthlyFixed(fixed, inst), 114000);
+assert('완납 할부 제외', calcMonthlyFixed([], [{ monthlyAmount: 10000, paidMonths: 12, months: 12 }]), 0);
+
+out.innerHTML += '<h2>calcMonthlyLoanReserve</h2>';
+const today = new Date(2026, 3, 5);
+const loans = [{ remainingBalance: 300000, targetDate: '2026-05-05' }];
+const reserve = calcMonthlyLoanReserve(loans, today);
+assert('대출 적립 > 0', reserve > 0, true);
+
+out.innerHTML += '<h2>calcDailyBudget</h2>';
+assert('일일 예산', calcDailyBudget(620000, new Date(2026, 3, 5)), Math.round(620000 / 26));
+
+out.innerHTML += '<h2>getBudgetState</h2>';
+assert('good',   getBudgetState(6000, 10000), 'good');
+assert('warn',   getBudgetState(3000, 10000), 'warn');
+assert('danger', getBudgetState(1000, 10000), 'danger');
+assert('over',   getBudgetState(-500, 10000), 'over');
+
+out.innerHTML += '<h2>formatDate</h2>';
+assert('날짜 포맷', formatDate(new Date(2026, 3, 5)), '2026-04-05');
+
+out.innerHTML += `<div style="margin-top:20px; padding:12px; background:#0a1120; border-radius:8px;">
+  <span class="pass">✓ ${passed} passed</span>
+  ${failed ? `<span class="fail" style="margin-left:12px;">✗ ${failed} failed</span>` : ''}
+</div>`;
+</script>
+</body>
+</html>

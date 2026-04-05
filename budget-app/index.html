@@ -129,6 +129,116 @@
 
     function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+    // ── CALCULATIONS ─────────────────────────────────────────────────────
+
+    function countWeekdayInMonth(year, month, day) {
+      let count = 0;
+      const date = new Date(year, month - 1, 1);
+      while (date.getMonth() === month - 1) {
+        if (date.getDay() === day) count++;
+        date.setDate(date.getDate() + 1);
+      }
+      return count;
+    }
+
+    function getWeekKey(date) {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+      const week1 = new Date(d.getFullYear(), 0, 4);
+      const wn = 1 + Math.round(((d - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+      return `${d.getFullYear()}-W${String(wn).padStart(2, '00')}`;
+    }
+
+    function calcMonthlyWorkIncome(work, workLog, year, month) {
+      const { pattern, hourlyWage } = work;
+      if (!pattern.length || !hourlyWage) return 0;
+      const baseWeeklyHours = pattern.reduce((s, p) => s + p.hours, 0);
+      const weekTotals = {};
+      const date = new Date(year, month - 1, 1);
+      while (date.getMonth() === month - 1) {
+        const wk = getWeekKey(date);
+        if (!weekTotals[wk]) {
+          const log = workLog.find(l => l.weekKey === wk);
+          weekTotals[wk] = log ? log.actualHours : baseWeeklyHours;
+        }
+        date.setDate(date.getDate() + 1);
+      }
+      const totalHours = Object.values(weekTotals).reduce((s, h) => s + h, 0);
+      return Math.round(totalHours * hourlyWage);
+    }
+
+    function calcMonthlyIncome(settings, work, workLog, year, month) {
+      return (settings.allowance || 0) + calcMonthlyWorkIncome(work, workLog, year, month);
+    }
+
+    function calcMonthlyFixed(fixedExpenses, installments) {
+      const fixed = fixedExpenses.reduce((s, f) => s + (f.amount || 0), 0);
+      const inst  = installments
+        .filter(i => i.paidMonths < i.months)
+        .reduce((s, i) => s + (i.monthlyAmount || 0), 0);
+      return fixed + inst;
+    }
+
+    function calcMonthlyLoanReserve(loans, today) {
+      const todayMs = new Date(today).setHours(0, 0, 0, 0);
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const remainingDaysInMonth = lastDay.getDate() - today.getDate() + 1;
+      return loans.reduce((sum, loan) => {
+        if (!loan.remainingBalance || !loan.targetDate) return sum;
+        const targetMs = new Date(loan.targetDate).setHours(0, 0, 0, 0);
+        const daysLeft = Math.max(1, Math.round((targetMs - todayMs) / 86400000));
+        const dailyReserve = loan.remainingBalance / daysLeft;
+        return sum + dailyReserve * remainingDaysInMonth;
+      }, 0);
+    }
+
+    function calcDisposableIncome(settings, work, workLog, fixedExpenses, installments, loans, today) {
+      const year  = today.getFullYear();
+      const month = today.getMonth() + 1;
+      const income      = calcMonthlyIncome(settings, work, workLog, year, month);
+      const fixedTotal  = calcMonthlyFixed(fixedExpenses, installments);
+      const loanReserve = calcMonthlyLoanReserve(loans, today);
+      return Math.round(income - fixedTotal - loanReserve);
+    }
+
+    function calcDailyBudget(disposable, today) {
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      const remaining = lastDay - today.getDate() + 1;
+      return Math.round(disposable / remaining);
+    }
+
+    function calcTodaySpent(expenses, today) {
+      const todayStr = formatDate(today);
+      return expenses
+        .filter(e => e.date === todayStr)
+        .reduce((s, e) => s + (e.myAmount ?? e.amount ?? 0), 0);
+    }
+
+    function getBudgetState(remaining, dailyBudget) {
+      if (remaining < 0)                          return 'over';
+      if (remaining / dailyBudget < 0.2)          return 'danger';
+      if (remaining / dailyBudget < 0.5)          return 'warn';
+      return 'good';
+    }
+
+    function formatDate(date) {
+      const d = new Date(date);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function formatKRW(amount) {
+      const abs = Math.abs(Math.round(amount));
+      const formatted = abs.toLocaleString('ko-KR');
+      return (amount < 0 ? '− ' : '') + '₩ ' + formatted;
+    }
+
+    function calcDaysLeft(targetDate, today) {
+      const t = new Date(targetDate).setHours(0, 0, 0, 0);
+      const n = new Date(today).setHours(0, 0, 0, 0);
+      return Math.max(0, Math.round((t - n) / 86400000));
+    }
+
     // ── TAB NAVIGATION ──────────────────────────────────────────────
     let currentTab = 'home';
 
