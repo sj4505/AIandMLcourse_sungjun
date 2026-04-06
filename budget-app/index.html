@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>가계부</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #0f172a;
+      --bg2:      #0a1120;
+      --border:   #1e293b;
+      --text:     #f1f5f9;
+      --text2:    #94a3b8;
+      --text3:    #475569;
+      --green:    #34d399;
+      --amber:    #fbbf24;
+      --red:      #f87171;
+      --red2:     #ef4444;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      min-height: 100dvh;
+      overscroll-behavior: none;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .color-good   { color: var(--green); }
+    .color-warn   { color: var(--amber); }
+    .color-danger { color: var(--red);   }
+    .color-over   { color: var(--red2);  }
+  </style>
+</head>
+<body class="flex flex-col" style="min-height:100dvh;">
+
+  <main id="main" class="flex-1 overflow-y-auto pb-16" style="-webkit-overflow-scrolling:touch;">
+    <div id="tab-home"         class="tab-content active p-4"></div>
+    <div id="tab-expense"      class="tab-content p-4"></div>
+    <div id="tab-installments" class="tab-content p-4"></div>
+    <div id="tab-settings"     class="tab-content p-4"></div>
+  </main>
+
+  <nav class="fixed bottom-0 left-0 right-0 flex border-t" style="background:#080f1e; border-color:var(--border); height:56px;">
+    <button class="tab-btn flex-1 flex flex-col items-center justify-center gap-0.5" data-tab="home"         onclick="switchTab('home')">
+      <span class="text-lg">🏠</span>
+      <span class="text-[9px] mono uppercase tracking-wide tab-btn-label">홈</span>
+    </button>
+    <button class="tab-btn flex-1 flex flex-col items-center justify-center gap-0.5" data-tab="expense"      onclick="switchTab('expense')">
+      <span class="text-lg">➕</span>
+      <span class="text-[9px] mono uppercase tracking-wide tab-btn-label">지출</span>
+    </button>
+    <button class="tab-btn flex-1 flex flex-col items-center justify-center gap-0.5" data-tab="installments" onclick="switchTab('installments')">
+      <span class="text-lg">💳</span>
+      <span class="text-[9px] mono uppercase tracking-wide tab-btn-label">할부</span>
+    </button>
+    <button class="tab-btn flex-1 flex flex-col items-center justify-center gap-0.5" data-tab="settings"     onclick="switchTab('settings')">
+      <span class="text-lg">⚙️</span>
+      <span class="text-[9px] mono uppercase tracking-wide tab-btn-label">설정</span>
+    </button>
+  </nav>
+
+  <script>
+    // ── STORAGE ─────────────────────────────────────────────────────────
+    const KEYS = {
+      settings:     'budgetApp_settings',
+      work:         'budgetApp_work',
+      workLog:      'budgetApp_workLog',
+      fixed:        'budgetApp_fixed',
+      expenses:     'budgetApp_expenses',
+      installments: 'budgetApp_installments',
+      loans:        'budgetApp_loans',
+      categories:   'budgetApp_categories',
+    };
+
+    const DEFAULT_CATEGORIES = [
+      '식비','카페','편의점','교통','쇼핑','구독','의료','문화',
+      '자기관리','단백질음료','운동','사줌','기타'
+    ].map((name, i) => ({ id: i + 1, name, isDefault: true }));
+
+    const DEFAULT_DATA = {
+      [KEYS.settings]:     { allowance: 0, apiKey: '' },
+      [KEYS.work]:         { pattern: [], hourlyWage: 10030 },
+      [KEYS.workLog]:      [],
+      [KEYS.fixed]:        [],
+      [KEYS.expenses]:     [],
+      [KEYS.installments]: [],
+      [KEYS.loans]:        [],
+      [KEYS.categories]:   DEFAULT_CATEGORIES,
+    };
+
+    function store(key)        { return JSON.parse(localStorage.getItem(key) ?? 'null'); }
+    function save(key, val)    { localStorage.setItem(key, JSON.stringify(val)); }
+
+    function getOrDefault(key) {
+      const val = store(key);
+      return val !== null ? val : DEFAULT_DATA[key];
+    }
+
+    function initStorage() {
+      Object.keys(DEFAULT_DATA).forEach(key => {
+        if (store(key) === null) save(key, DEFAULT_DATA[key]);
+      });
+    }
+
+    const db = {
+      settings:     () => getOrDefault(KEYS.settings),
+      work:         () => getOrDefault(KEYS.work),
+      workLog:      () => getOrDefault(KEYS.workLog),
+      fixed:        () => getOrDefault(KEYS.fixed),
+      expenses:     () => getOrDefault(KEYS.expenses),
+      installments: () => getOrDefault(KEYS.installments),
+      loans:        () => getOrDefault(KEYS.loans),
+      categories:   () => getOrDefault(KEYS.categories),
+
+      saveSettings:     v => save(KEYS.settings, v),
+      saveWork:         v => save(KEYS.work, v),
+      saveWorkLog:      v => save(KEYS.workLog, v),
+      saveFixed:        v => save(KEYS.fixed, v),
+      saveExpenses:     v => save(KEYS.expenses, v),
+      saveInstallments: v => save(KEYS.installments, v),
+      saveLoans:        v => save(KEYS.loans, v),
+      saveCategories:   v => save(KEYS.categories, v),
+    };
+
+    function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+    // ── CALCULATIONS ─────────────────────────────────────────────────────
+
+    function countWeekdayInMonth(year, month, day) {
+      let count = 0;
+      const date = new Date(year, month - 1, 1);
+      while (date.getMonth() === month - 1) {
+        if (date.getDay() === day) count++;
+        date.setDate(date.getDate() + 1);
+      }
+      return count;
+    }
+
+    function getWeekKey(date) {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+      const week1 = new Date(d.getFullYear(), 0, 4);
+      const wn = 1 + Math.round(((d - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+      return `${d.getFullYear()}-W${String(wn).padStart(2, '00')}`;
+    }
+
+    function calcMonthlyWorkIncome(work, workLog, year, month) {
+      const { pattern, hourlyWage } = work;
+      if (!pattern.length || !hourlyWage) return 0;
+      const baseWeeklyHours = pattern.reduce((s, p) => s + p.hours, 0);
+      const weekTotals = {};
+      const date = new Date(year, month - 1, 1);
+      while (date.getMonth() === month - 1) {
+        const wk = getWeekKey(date);
+        if (!weekTotals[wk]) {
+          const log = workLog.find(l => l.weekKey === wk);
+          weekTotals[wk] = log ? log.actualHours : baseWeeklyHours;
+        }
+        date.setDate(date.getDate() + 1);
+      }
+      const totalHours = Object.values(weekTotals).reduce((s, h) => s + h, 0);
+      return Math.round(totalHours * hourlyWage);
+    }
+
+    function calcMonthlyIncome(settings, work, workLog, year, month) {
+      return (settings.allowance || 0) + calcMonthlyWorkIncome(work, workLog, year, month);
+    }
+
+    function calcMonthlyFixed(fixedExpenses, installments) {
+      const fixed = fixedExpenses.reduce((s, f) => s + (f.amount || 0), 0);
+      const inst  = installments
+        .filter(i => i.paidMonths < i.months)
+        .reduce((s, i) => s + (i.monthlyAmount || 0), 0);
+      return fixed + inst;
+    }
+
+    function calcMonthlyLoanReserve(loans, today) {
+      const todayMs = new Date(today).setHours(0, 0, 0, 0);
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const remainingDaysInMonth = lastDay.getDate() - today.getDate() + 1;
+      return loans.reduce((sum, loan) => {
+        if (!loan.remainingBalance || !loan.targetDate) return sum;
+        const targetMs = new Date(loan.targetDate).setHours(0, 0, 0, 0);
+        const daysLeft = Math.max(1, Math.round((targetMs - todayMs) / 86400000));
+        const dailyReserve = loan.remainingBalance / daysLeft;
+        return sum + dailyReserve * remainingDaysInMonth;
+      }, 0);
+    }
+
+    function calcDisposableIncome(settings, work, workLog, fixedExpenses, installments, loans, today) {
+      const year  = today.getFullYear();
+      const month = today.getMonth() + 1;
+      const income      = calcMonthlyIncome(settings, work, workLog, year, month);
+      const fixedTotal  = calcMonthlyFixed(fixedExpenses, installments);
+      const loanReserve = calcMonthlyLoanReserve(loans, today);
+      return Math.round(income - fixedTotal - loanReserve);
+    }
+
+    function calcMonthSpent(expenses, today) {
+      const y = today.getFullYear(), m = today.getMonth() + 1;
+      const prefix = `${y}-${String(m).padStart(2,'0')}`;
+      return expenses
+        .filter(e => e.date && e.date.startsWith(prefix))
+        .reduce((s, e) => s + (e.myAmount ?? e.amount ?? 0), 0);
+    }
+
+    function calcDailyBudget(disposable, expenses, today) {
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      const remaining = lastDay - today.getDate() + 1;
+      const monthSpent = calcMonthSpent(expenses, today);
+      return Math.round((disposable - monthSpent) / remaining);
+    }
+
+    function calcTodaySpent(expenses, today) {
+      const todayStr = formatDate(today);
+      return expenses
+        .filter(e => e.date === todayStr)
+        .reduce((s, e) => s + (e.myAmount ?? e.amount ?? 0), 0);
+    }
+
+    function getBudgetState(remaining, dailyBudget) {
+      if (remaining < 0)                          return 'over';
+      if (remaining / dailyBudget < 0.2)          return 'danger';
+      if (remaining / dailyBudget < 0.5)          return 'warn';
+      return 'good';
+    }
+
+    function formatDate(date) {
+      const d = new Date(date);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function formatKRW(amount) {
+      const abs = Math.abs(Math.round(amount));
+      const formatted = abs.toLocaleString('ko-KR');
+      return (amount < 0 ? '− ' : '') + '₩ ' + formatted;
+    }
+
+    function calcDaysLeft(targetDate, today) {
+      const t = new Date(targetDate).setHours(0, 0, 0, 0);
+      const n = new Date(today).setHours(0, 0, 0, 0);
+      return Math.max(0, Math.round((t - n) / 86400000));
+    }
+
+    // ── UI HELPERS ────────────────────────────────────────────────────────
+
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function el(tag, attrs = {}, ...children) {
+      const elem = document.createElement(tag);
+      Object.entries(attrs).forEach(([k, v]) => {
+        if (k === 'class') elem.className = v;
+        else if (k === 'style') elem.style.cssText = v;
+        else if (k.startsWith('on')) elem.addEventListener(k.slice(2), v);
+        else elem.setAttribute(k, v);
+      });
+      children.forEach(c => {
+        if (c == null) return;
+        elem.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+      });
+      return elem;
+    }
+
+    function setHTML(id, html) { document.getElementById(id).innerHTML = html; }
+
+    const DAYS = ['일','월','화','수','목','금','토'];
+
+    function showToast(msg, type = 'info') {
+      const existing = document.getElementById('toast');
+      if (existing) existing.remove();
+      const toast = el('div', {
+        id: 'toast',
+        style: `position:fixed;bottom:72px;left:50%;transform:translateX(-50%);
+                background:${type==='warn'?'#7f1d1d':'#0d2a1f'};
+                color:${type==='warn'?'#fca5a5':'#6ee7b7'};
+                padding:8px 16px;border-radius:8px;font-size:13px;
+                font-family:monospace;z-index:999;white-space:nowrap;`
+      }, msg);
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2000);
+    }
+
+    // ── TAB NAVIGATION ──────────────────────────────────────────────
+    let currentTab = 'home';
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        const isActive = btn.dataset.tab === name;
+        btn.querySelector('.tab-btn-label').style.color = isActive ? 'var(--green)' : 'var(--text3)';
+      });
+      currentTab = name;
+      renderTab(name);
+    }
+
+    function renderTab(name) {
+      if (name === 'home')         renderHome();
+      if (name === 'expense')      renderExpense();
+      if (name === 'installments') renderInstallments();
+      if (name === 'settings')     renderSettings();
+    }
+
+    function renderHome() {
+  const tab          = document.getElementById('tab-home');
+  const today        = new Date();
+  const settings     = db.settings();
+  const work         = db.work();
+  const workLog      = db.workLog();
+  const fixedExp     = db.fixed();
+  const installments = db.installments();
+  const loans        = db.loans();
+  const expenses     = db.expenses();
+
+  // 초기 설정이 안 된 경우 안내
+  if (!settings.allowance && !work.pattern.length) {
+    tab.innerHTML = `
+      <div style="max-width:480px;margin:0 auto;padding-top:40px;text-align:center;">
+        <div class="mono text-3xl mb-4">₩</div>
+        <div class="text-sm font-bold mb-2">설정을 먼저 해주세요</div>
+        <p class="text-xs mb-6" style="color:var(--text3);">용돈, 알바 패턴, 시급을 등록하면<br>일일 예산을 자동으로 계산합니다.</p>
+        <button onclick="switchTab('settings')"
+          class="rounded-lg px-6 py-2.5 text-sm font-bold"
+          style="background:var(--green);color:#0f172a;">설정 시작 →</button>
+      </div>`;
+    return;
+  }
+
+  const year  = today.getFullYear();
+  const month = today.getMonth() + 1;
+
+  const workIncome   = calcMonthlyWorkIncome(work, workLog, year, month);
+  const totalIncome  = workIncome + (settings.allowance || 0);
+  const fixedTotal   = calcMonthlyFixed(fixedExp, installments);
+  const loanReserve  = calcMonthlyLoanReserve(loans, today);
+  const disposable   = Math.round(totalIncome - fixedTotal - loanReserve);
+  const dailyBudget  = calcDailyBudget(disposable, expenses, today);
+  const todaySpent   = calcTodaySpent(expenses, today);
+  const remaining    = dailyBudget - todaySpent;
+  const state        = getBudgetState(remaining, dailyBudget);
+
+  const colorMap = { good:'var(--green)', warn:'var(--amber)', danger:'var(--red)', over:'var(--red2)' };
+  const color = colorMap[state];
+  const barPct = dailyBudget > 0 ? Math.max(0, Math.min(100, (remaining / dailyBudget) * 100)) : 0;
+
+  const recentExp = [...expenses]
+    .sort((a, b) => b.id.localeCompare(a.id))
+    .slice(0, 5);
+
+  tab.innerHTML = `
+    <div style="max-width:480px;margin:0 auto;">
+
+      <div class="mb-6 rounded-xl p-4" style="background:var(--bg2);border:1px solid var(--border);">
+        <div class="mono text-[10px] uppercase tracking-widest mb-1" style="color:var(--text3)">오늘의 잔여 예산</div>
+        <div class="mono font-bold" style="font-size:36px;letter-spacing:-1px;color:${color};">${formatKRW(remaining)}</div>
+        <div class="mt-2 rounded-full overflow-hidden" style="height:3px;background:var(--border);">
+          <div style="height:100%;width:${barPct}%;background:${color};border-radius:2px;transition:width 0.3s;"></div>
+        </div>
+        <div class="flex justify-between mt-1">
+          <span class="mono text-[10px]" style="color:var(--text3)">일일예산 ${formatKRW(dailyBudget)}</span>
+          <span class="mono text-[10px]" style="color:var(--text3)">오늘지출 ${formatKRW(todaySpent)}</span>
+        </div>
+      </div>
+
+      <div class="mb-6 rounded-xl p-4" style="background:var(--bg2);border:1px solid var(--border);">
+        <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--text3)">이번달 분석</div>
+        ${[
+          ['알바 예상', workIncome, false],
+          ['용돈', settings.allowance || 0, false],
+          ['고정 지출', fixedTotal, true],
+          ['할부 합계', installments.filter(i=>i.paidMonths<i.months).reduce((s,i)=>s+i.monthlyAmount,0), true],
+          ['대출 적립', Math.round(loanReserve), true],
+        ].map(([label, val, minus]) => `
+          <div class="flex justify-between items-center py-2" style="border-bottom:1px solid var(--border);">
+            <span class="text-xs" style="color:var(--text2)">${label}</span>
+            <span class="mono text-sm font-bold" style="color:${minus?'var(--red)':'var(--text)'};">
+              ${minus ? '−' : ''} ${formatKRW(val)}
+            </span>
+          </div>`).join('')}
+        <div class="flex justify-between items-center pt-3">
+          <span class="text-sm font-bold" style="color:var(--text)">가처분 소득</span>
+          <span class="mono font-bold" style="font-size:18px;color:var(--green);">${formatKRW(disposable)}</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--text3)">최근 지출</div>
+        ${recentExp.length === 0
+          ? `<p class="text-xs" style="color:var(--text3)">지출 내역이 없습니다.</p>`
+          : recentExp.map(e => `
+            <div class="flex justify-between items-center py-2.5" style="border-bottom:1px solid var(--border);">
+              <div>
+                <span class="text-sm">${e.merchant || '직접입력'}</span>
+                <span class="ml-2 text-[10px] mono px-1.5 py-0.5 rounded" style="background:var(--border);color:var(--text3);">${e.category}</span>
+                ${e.isDutch ? `<span class="ml-1 text-[10px] mono px-1.5 py-0.5 rounded" style="background:#1e1b4b;color:#818cf8;">더치÷${e.splitCount}</span>` : ''}
+              </div>
+              <span class="mono text-sm font-bold" style="color:var(--text);">${formatKRW(e.myAmount ?? e.amount)}</span>
+            </div>`).join('')}
+      </div>
+
+    </div>`;
+}
+    function renderExpense() {
+      const tab = document.getElementById('tab-expense');
+      _dutchOn = false;
+      window._parsedExpense = null;
+
+      tab.innerHTML = `
+        <div style="max-width:480px;margin:0 auto;">
+
+          <div class="mono text-[10px] uppercase tracking-widest mb-4" style="color:var(--text3)">지출 입력</div>
+
+          <div class="mb-4">
+            <label class="text-xs mb-1 block" style="color:var(--text2)">카드 결제 문자 붙여넣기</label>
+            <textarea id="sms-input" rows="4" placeholder="[신한카드] 승인 ₩15,900&#10;GS리테일(GS25) 01/15 14:32..."
+              class="w-full rounded-lg px-3 py-2 text-sm"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);resize:none;"></textarea>
+            <button id="btn-analyze" onclick="analyzeSMS()"
+              class="w-full mt-2 rounded-lg py-2.5 text-sm font-bold"
+              style="background:var(--green);color:#0f172a;">분석</button>
+          </div>
+
+          <div id="parsed-result"></div>
+
+          <div class="mt-4">
+            <button onclick="toggleManualForm()" class="text-xs" style="color:var(--text3);">직접 입력 →</button>
+            <div id="manual-form" class="hidden mt-3">
+              <div class="flex gap-2 mb-2">
+                <input id="m-amount" type="number" placeholder="금액"
+                  class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                  style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+                <select id="m-category" class="rounded-lg px-2 py-2 text-sm"
+                  style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+                  ${db.categories().map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+                </select>
+              </div>
+              <input id="m-merchant" placeholder="가맹점 / 내용"
+                class="w-full rounded-lg px-3 py-2 text-sm mb-2"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <input id="m-date" type="date" value="${formatDate(new Date())}"
+                class="w-full rounded-lg px-3 py-2 text-sm mono mb-2"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <button onclick="saveManualExpense()"
+                class="w-full rounded-lg py-2.5 text-sm font-bold"
+                style="background:var(--green);color:#0f172a;">저장</button>
+            </div>
+          </div>
+
+        </div>`;
+    }
+
+    function toggleManualForm() {
+      document.getElementById('manual-form').classList.toggle('hidden');
+    }
+
+    function saveManualExpense() {
+      const amount   = parseInt(document.getElementById('m-amount').value) || 0;
+      const category = document.getElementById('m-category').value;
+      const merchant = document.getElementById('m-merchant').value.trim() || '직접입력';
+      const date     = document.getElementById('m-date').value || formatDate(new Date());
+
+      if (!amount) { showToast('금액을 입력하세요', 'warn'); return; }
+
+      const expenses = db.expenses();
+      expenses.push({ id: genId(), date, amount, myAmount: amount, merchant, category, memo: '', source: 'manual', isDutch: false, splitCount: 1 });
+      db.saveExpenses(expenses);
+      showToast('지출 저장됨');
+      switchTab('home');
+    }
+    function renderInstallments() {
+      const tab          = document.getElementById('tab-installments');
+      const installments = db.installments();
+      const loans        = db.loans();
+      const today        = new Date();
+
+      function instCard(i) {
+        const pct     = Math.min(100, Math.round((i.paidMonths / i.months) * 100));
+        const lastOne = i.months - i.paidMonths === 1;
+        const barColor = lastOne ? 'var(--red)' : 'var(--green)';
+        return `
+          <div class="rounded-xl p-4 mb-3" style="background:var(--bg2);border:1px solid ${lastOne ? 'var(--red)' : 'var(--border)'};">
+            <div class="flex justify-between items-start mb-2">
+              <span class="text-sm font-medium">${escapeHtml(i.name)}</span>
+              <div class="flex gap-1 items-center">
+                ${lastOne ? `<span class="text-[9px] mono px-2 py-0.5 rounded" style="background:#2d1515;color:var(--red);">⚠ 마지막달</span>` : ''}
+                <span class="text-[9px] mono px-2 py-0.5 rounded" style="background:var(--border);color:var(--text3);">${i.paidMonths}/${i.months}개월</span>
+              </div>
+            </div>
+            <div class="rounded-full overflow-hidden mb-2" style="height:2px;background:var(--border);">
+              <div style="height:100%;width:${pct}%;background:${barColor};"></div>
+            </div>
+            <div class="flex justify-between text-xs mono">
+              <span style="color:var(--text2)">월 ${formatKRW(i.monthlyAmount)}</span>
+              <span style="color:var(--text3)">잔여 ${formatKRW(i.monthlyAmount * (i.months - i.paidMonths))}</span>
+            </div>
+            <div class="flex gap-2 mt-3">
+              <button onclick="markInstallmentPaid('${i.id}')"
+                class="flex-1 rounded-lg py-1.5 text-xs font-bold"
+                style="background:var(--green);color:#0f172a;">이번달 납부 완료</button>
+              <button onclick="deleteInstallment('${i.id}')"
+                class="px-3 rounded-lg text-xs"
+                style="background:var(--border);color:var(--text3);">삭제</button>
+            </div>
+          </div>`;
+      }
+
+      function loanCard(l) {
+        const daysLeft    = calcDaysLeft(l.targetDate, today);
+        const dailyAmount = l.remainingBalance / Math.max(1, daysLeft);
+        return `
+          <div class="rounded-xl p-4 mb-3" style="background:var(--bg2);border:1px solid var(--border);">
+            <div class="flex justify-between items-start mb-2">
+              <span class="text-sm font-medium">${escapeHtml(l.name)}</span>
+              <span class="text-[9px] mono px-2 py-0.5 rounded" style="background:#1c1917;color:var(--amber);">D-${daysLeft}</span>
+            </div>
+            <div class="flex justify-between text-xs mono">
+              <span style="color:var(--text2)">일 ${formatKRW(Math.round(dailyAmount))} 적립</span>
+              <span style="color:var(--text3)">잔여 ${formatKRW(l.remainingBalance)}</span>
+            </div>
+            <div class="flex gap-2 mt-3">
+              <button onclick="openUpdateLoan('${l.id}')"
+                class="flex-1 rounded-lg py-1.5 text-xs"
+                style="background:var(--border);color:var(--text2);">잔액 수정</button>
+              <button onclick="deleteLoan('${l.id}')"
+                class="px-3 rounded-lg text-xs"
+                style="background:var(--border);color:var(--text3);">삭제</button>
+            </div>
+          </div>`;
+      }
+
+      tab.innerHTML = `
+        <div style="max-width:480px;margin:0 auto;">
+
+          <!-- 할부 섹션 -->
+          <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">할부</div>
+          ${installments.length ? installments.map(instCard).join('') : '<p class="text-xs mb-4" style="color:var(--text3)">할부 없음</p>'}
+          <button onclick="openAddInstallment()"
+            class="w-full rounded-lg py-2 text-sm mb-6"
+            style="background:var(--bg2);border:1px solid var(--border);color:var(--text2);">+ 할부 추가</button>
+
+          <!-- 대출 섹션 -->
+          <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">대출</div>
+          ${loans.length ? loans.map(loanCard).join('') : '<p class="text-xs mb-4" style="color:var(--text3)">대출 없음</p>'}
+          <button onclick="openAddLoan()"
+            class="w-full rounded-lg py-2 text-sm mb-6"
+            style="background:var(--bg2);border:1px solid var(--border);color:var(--text2);">+ 대출 추가</button>
+
+        </div>
+
+        <!-- 할부 추가 모달 -->
+        <div id="modal-installment" class="hidden fixed inset-0 z-50 flex items-end justify-center"
+          style="background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);">
+          <div class="w-full rounded-t-2xl p-5" style="background:#0d1829;max-width:480px;">
+            <div class="text-sm font-bold mb-4">할부 추가</div>
+            <input id="i-name" placeholder="항목명 (예: 에어팟 프로)"
+              class="w-full rounded-lg px-3 py-2 text-sm mb-2"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            <div class="flex gap-2 mb-2">
+              <input id="i-total" type="number" placeholder="총 금액" min="1"
+                class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <input id="i-months" type="number" placeholder="개월" min="1"
+                class="w-20 rounded-lg px-3 py-2 text-sm mono"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            </div>
+            <input id="i-start" type="month" value="${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}"
+              class="w-full rounded-lg px-3 py-2 text-sm mono mb-3"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            <button onclick="saveInstallment()"
+              class="w-full rounded-lg py-2.5 text-sm font-bold mb-2"
+              style="background:var(--green);color:#0f172a;">추가</button>
+            <button onclick="closeModal('modal-installment')"
+              class="w-full rounded-lg py-2 text-sm" style="color:var(--text3);">취소</button>
+          </div>
+        </div>
+
+        <!-- 대출 추가 모달 -->
+        <div id="modal-loan" class="hidden fixed inset-0 z-50 flex items-end justify-center"
+          style="background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);">
+          <div class="w-full rounded-t-2xl p-5" style="background:#0d1829;max-width:480px;">
+            <div class="text-sm font-bold mb-4">대출 추가</div>
+            <input id="l-name" placeholder="항목명 (예: 학자금 대출)"
+              class="w-full rounded-lg px-3 py-2 text-sm mb-2"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            <input id="l-balance" type="number" placeholder="잔여 금액" min="1"
+              class="w-full rounded-lg px-3 py-2 text-sm mono mb-2"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            <label class="text-xs mb-1 block" style="color:var(--text2)">목표 상환일</label>
+            <input id="l-target" type="date"
+              class="w-full rounded-lg px-3 py-2 text-sm mono mb-3"
+              style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+            <button onclick="saveLoan()"
+              class="w-full rounded-lg py-2.5 text-sm font-bold mb-2"
+              style="background:var(--green);color:#0f172a;">추가</button>
+            <button onclick="closeModal('modal-loan')"
+              class="w-full rounded-lg py-2 text-sm" style="color:var(--text3);">취소</button>
+          </div>
+        </div>`;
+    }
+
+    // ── EVENTS — 할부/대출 탭 ─────────────────────────────────────────────
+
+    function openAddInstallment() { document.getElementById('modal-installment').classList.remove('hidden'); }
+    function openAddLoan()        { document.getElementById('modal-loan').classList.remove('hidden'); }
+    function closeModal(id)       { document.getElementById(id).classList.add('hidden'); }
+
+    function saveInstallment() {
+      const name   = document.getElementById('i-name').value.trim();
+      const total  = parseInt(document.getElementById('i-total').value) || 0;
+      const months = parseInt(document.getElementById('i-months').value) || 0;
+      const start  = document.getElementById('i-start').value;
+      if (!name || total <= 0 || months <= 0) { showToast('모든 항목을 입력하세요', 'warn'); return; }
+
+      const list = db.installments();
+      list.push({ id: genId(), name, totalAmount: total, months, paidMonths: 0, startDate: start, monthlyAmount: Math.round(total / months) });
+      db.saveInstallments(list);
+      closeModal('modal-installment');
+      renderInstallments();
+    }
+
+    function markInstallmentPaid(id) {
+      const list = db.installments();
+      const item = list.find(i => i.id === id);
+      if (!item || item.paidMonths >= item.months) return;
+      item.paidMonths++;
+      if (item.paidMonths >= item.months) {
+        db.saveInstallments(list.filter(i => i.id !== id));
+        showToast(`${item.name} 완납 완료!`);
+      } else {
+        db.saveInstallments(list);
+      }
+      renderInstallments();
+    }
+
+    function deleteInstallment(id) {
+      db.saveInstallments(db.installments().filter(i => i.id !== id));
+      renderInstallments();
+    }
+
+    function saveLoan() {
+      const name    = document.getElementById('l-name').value.trim();
+      const balance = parseInt(document.getElementById('l-balance').value) || 0;
+      const target  = document.getElementById('l-target').value;
+      if (!name || balance <= 0 || !target) { showToast('모든 항목을 입력하세요', 'warn'); return; }
+
+      const list = db.loans();
+      list.push({ id: genId(), name, remainingBalance: balance, targetDate: target });
+      db.saveLoans(list);
+      closeModal('modal-loan');
+      renderInstallments();
+    }
+
+    function openUpdateLoan(id) {
+      const loan = db.loans().find(l => l.id === id);
+      if (!loan) return;
+      const newBal = prompt(`${loan.name} 잔여 금액 수정 (현재: ${loan.remainingBalance.toLocaleString()}원):`);
+      if (newBal === null) return;
+      const val = parseInt(newBal);
+      if (isNaN(val) || val < 0) { showToast('올바른 금액을 입력하세요', 'warn'); return; }
+      loan.remainingBalance = val;
+      db.saveLoans(db.loans().map(l => l.id === id ? loan : l));
+      renderInstallments();
+    }
+
+    function deleteLoan(id) {
+      db.saveLoans(db.loans().filter(l => l.id !== id));
+      renderInstallments();
+    }
+
+    function renderSettings() {
+      const tab = document.getElementById('tab-settings');
+      const settings = db.settings();
+      const work     = db.work();
+      const workLog  = db.workLog();
+      const fixed    = db.fixed();
+      const cats     = db.categories();
+
+      const thisWeek    = getWeekKey(new Date());
+      const weekLogEntry = workLog.find(l => l.weekKey === thisWeek);
+      const baseHours   = work.pattern.reduce((s, p) => s + p.hours, 0);
+      const actualHours = weekLogEntry ? weekLogEntry.actualHours : baseHours;
+
+      tab.innerHTML = `
+        <div style="max-width:480px;margin:0 auto;">
+
+          <div class="mb-6">
+            <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">수입</div>
+
+            <label class="block mb-3">
+              <span class="text-xs mb-1 block" style="color:var(--text2)">용돈 (월)</span>
+              <div class="flex gap-2">
+                <input id="inp-allowance" type="number" value="${settings.allowance}"
+                  class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                  style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+                <span class="flex items-center text-xs" style="color:var(--text3)">원</span>
+              </div>
+            </label>
+
+            <label class="block mb-3">
+              <span class="text-xs mb-1 block" style="color:var(--text2)">시급</span>
+              <div class="flex gap-2">
+                <input id="inp-wage" type="number" value="${work.hourlyWage}"
+                  class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                  style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+                <span class="flex items-center text-xs" style="color:var(--text3)">원</span>
+              </div>
+            </label>
+
+            <div class="mb-2">
+              <span class="text-xs mb-2 block" style="color:var(--text2)">알바 요일 & 시간</span>
+              <div class="flex gap-1 mb-2">
+                ${DAYS.map((d, i) => {
+                  const pat = work.pattern.find(p => p.day === i);
+                  return `<button class="day-btn flex-1 rounded py-1.5 text-xs mono"
+                    data-day="${i}"
+                    style="background:${pat?'var(--green)':'var(--bg2)'};
+                           color:${pat?'#0f172a':'var(--text3)'};
+                           border:1px solid ${pat?'var(--green)':'var(--border)'}"
+                    onclick="toggleDay(${i})">${d}</button>`;
+                }).join('')}
+              </div>
+              <div id="day-hours-inputs">
+                ${work.pattern.map(p => `
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs mono w-4" style="color:var(--text2)">${DAYS[p.day]}</span>
+                    <input type="number" value="${p.hours}" min="1" max="24"
+                      class="w-16 rounded px-2 py-1 text-xs mono"
+                      style="background:var(--bg2);border:1px solid var(--border);color:var(--text);"
+                      onchange="updateDayHours(${p.day}, this.value)">
+                    <span class="text-xs" style="color:var(--text3)">시간</span>
+                  </div>`).join('')}
+              </div>
+            </div>
+
+            <label class="block mb-3">
+              <span class="text-xs mb-1 block" style="color:var(--text2)">이번 주 실제 근무시간 (기본 ${baseHours}h)</span>
+              <div class="flex gap-2">
+                <input id="inp-actual-hours" type="number" value="${actualHours}" step="0.5"
+                  class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                  style="background:${actualHours !== baseHours ? 'rgba(52,211,153,0.05)' : 'var(--bg2)'};
+                         border:1px solid ${actualHours !== baseHours ? 'var(--green)' : 'var(--border)'};
+                         color:var(--text);">
+                <span class="flex items-center text-xs" style="color:var(--text3)">시간</span>
+              </div>
+            </label>
+
+            <button onclick="saveIncomeSettings()"
+              class="w-full rounded-lg py-2 text-sm font-bold"
+              style="background:var(--green);color:#0f172a;">수입 설정 저장</button>
+          </div>
+
+          <div class="mb-6">
+            <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">고정 지출</div>
+            <div id="fixed-list">
+              ${fixed.map(f => `
+                <div class="flex items-center gap-2 mb-2 rounded-lg px-3 py-2"
+                  style="background:var(--bg2);border:1px solid var(--border);">
+                  <span class="flex-1 text-sm">${f.name}</span>
+                  <span class="mono text-sm" style="color:var(--text2)">${formatKRW(f.amount)}</span>
+                  <button onclick="deleteFixed('${f.id}')" class="text-xs" style="color:var(--text3)">✕</button>
+                </div>`).join('') || '<p class="text-xs mb-2" style="color:var(--text3)">없음</p>'}
+            </div>
+            <div class="flex gap-2">
+              <input id="inp-fixed-name" placeholder="항목명" class="flex-1 rounded-lg px-3 py-2 text-sm"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <input id="inp-fixed-amount" type="number" placeholder="금액" class="w-24 rounded-lg px-3 py-2 text-sm mono"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <button onclick="addFixed()"
+                class="px-3 rounded-lg text-sm font-bold"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--green);">+</button>
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">카테고리</div>
+            <div class="flex flex-wrap gap-2 mb-3">
+              ${cats.map(c => `
+                <span class="flex items-center gap-1 rounded-full px-3 py-1 text-xs mono"
+                  style="background:var(--bg2);border:1px solid var(--border);color:var(--text2);">
+                  ${c.name}
+                  ${!c.isDefault ? `<button onclick="deleteCategory(${c.id})" style="color:var(--text3);">✕</button>` : ''}
+                </span>`).join('')}
+            </div>
+            <div class="flex gap-2">
+              <input id="inp-cat-name" placeholder="새 카테고리" class="flex-1 rounded-lg px-3 py-2 text-sm"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <button onclick="addCategory()"
+                class="px-3 rounded-lg text-sm font-bold"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--green);">추가</button>
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <div class="mono text-[10px] uppercase tracking-widest mb-3" style="color:var(--green)">OpenAI API</div>
+            <div class="flex gap-2">
+              <input id="inp-apikey" type="password" value="${settings.apiKey}"
+                placeholder="sk-..."
+                class="flex-1 rounded-lg px-3 py-2 text-sm mono"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--text);">
+              <button onclick="saveApiKey()"
+                class="px-3 rounded-lg text-sm font-bold"
+                style="background:var(--bg2);border:1px solid var(--border);color:var(--green);">저장</button>
+            </div>
+            <p class="text-xs mt-1" style="color:var(--text3)">이 기기 localStorage에만 저장됩니다.</p>
+          </div>
+
+        </div>`;
+    }
+
+    // ── EVENTS — 설정 탭 ─────────────────────────────────────────────────
+
+    function toggleDay(dayIdx) {
+      const work = db.work();
+      const exists = work.pattern.findIndex(p => p.day === dayIdx);
+      if (exists >= 0) work.pattern.splice(exists, 1);
+      else work.pattern.push({ day: dayIdx, hours: 5 });
+      work.pattern.sort((a, b) => a.day - b.day);
+      db.saveWork(work);
+      renderSettings();
+    }
+
+    function updateDayHours(dayIdx, val) {
+      const work = db.work();
+      const pat = work.pattern.find(p => p.day === dayIdx);
+      if (pat) pat.hours = parseFloat(val) || 0;
+      db.saveWork(work);
+    }
+
+    function saveIncomeSettings() {
+      const settings = db.settings();
+      settings.allowance = parseInt(document.getElementById('inp-allowance').value) || 0;
+      db.saveSettings(settings);
+
+      const work = db.work();
+      work.hourlyWage = parseInt(document.getElementById('inp-wage').value) || 0;
+      db.saveWork(work);
+
+      const thisWeek = getWeekKey(new Date());
+      const workLog = db.workLog();
+      const actualHours = parseFloat(document.getElementById('inp-actual-hours').value) || 0;
+      const idx = workLog.findIndex(l => l.weekKey === thisWeek);
+      if (idx >= 0) workLog[idx].actualHours = actualHours;
+      else workLog.push({ weekKey: thisWeek, actualHours });
+      db.saveWorkLog(workLog);
+
+      showToast('수입 설정 저장됨');
+      if (currentTab === 'home') renderHome();
+    }
+
+    function deleteFixed(id) {
+      db.saveFixed(db.fixed().filter(f => f.id !== id));
+      renderSettings();
+      if (currentTab === 'home') renderHome();
+    }
+
+    function addFixed() {
+      const name   = document.getElementById('inp-fixed-name').value.trim();
+      const amount = parseInt(document.getElementById('inp-fixed-amount').value) || 0;
+      if (!name || !amount) { showToast('항목명과 금액을 입력하세요', 'warn'); return; }
+      const fixed = db.fixed();
+      fixed.push({ id: genId(), name, amount });
+      db.saveFixed(fixed);
+      renderSettings();
+      if (currentTab === 'home') renderHome();
+    }
+
+    function addCategory() {
+      const name = document.getElementById('inp-cat-name').value.trim();
+      if (!name) return;
+      const cats = db.categories();
+      if (cats.find(c => c.name === name)) { showToast('이미 있는 카테고리입니다', 'warn'); return; }
+      cats.push({ id: genId(), name, isDefault: false });
+      db.saveCategories(cats);
+      renderSettings();
+    }
+
+    function deleteCategory(id) {
+      db.saveCategories(db.categories().filter(c => c.id !== id));
+      renderSettings();
+    }
+
+    function saveApiKey() {
+      const settings = db.settings();
+      settings.apiKey = document.getElementById('inp-apikey').value.trim();
+      db.saveSettings(settings);
+      showToast('API 키 저장됨');
+    }
+
+    // ── EVENTS — 지출 탭 ─────────────────────────────────────────────────
+
+    async function callOpenAI(systemPrompt, userPrompt) {
+      const key = db.settings().apiKey;
+      if (!key) { showToast('설정에서 API 키를 입력해주세요', 'warn'); return null; }
+      try {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user',   content: userPrompt   },
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0,
+          }),
+        });
+        if (!res.ok) { showToast(`API 오류: ${res.status}`, 'warn'); return null; }
+        const data = await res.json();
+        return JSON.parse(data.choices[0].message.content);
+      } catch {
+        showToast('API 호출 실패. 네트워크를 확인해주세요', 'warn');
+        return null;
+      }
+    }
+
+    async function analyzeSMS() {
+      const smsText = document.getElementById('sms-input').value.trim();
+      if (!smsText) { showToast('문자를 붙여넣어 주세요', 'warn'); return; }
+
+      const btn = document.getElementById('btn-analyze');
+      btn.textContent = '분석 중...';
+      btn.disabled = true;
+
+      const cats = db.categories().map(c => c.name).join(', ');
+      const today = new Date();
+      const todaySpent = calcTodaySpent(db.expenses(), today);
+      const dailyBudget = calcDailyBudget(
+        calcDisposableIncome(db.settings(), db.work(), db.workLog(), db.fixed(), db.installments(), db.loans(), today),
+        db.expenses(),
+        today
+      );
+
+      const systemPrompt = `한국 카드사 SMS에서 결제 정보를 추출해 JSON으로 반환하라.
+카테고리는 반드시 다음 중 하나: ${cats}
+JSON 형식: { "amount": number, "merchant": string, "category": string, "date": "YYYY-MM-DD", "feedback": string }
+feedback은 오늘 예산 상황을 포함한 1문장 한국어 코멘트. 절약 조언이나 격려 포함.`;
+
+      const userPrompt = `SMS:\n${smsText}\n\n오늘 날짜: ${formatDate(today)}\n일일예산: ${dailyBudget}원\n오늘 지출합계: ${todaySpent}원`;
+
+      let result;
+      try {
+        result = await callOpenAI(systemPrompt, userPrompt);
+      } finally {
+        btn.textContent = '분석';
+        btn.disabled = false;
+      }
+
+      if (!result) return;
+
+      result.amount = parseInt(result.amount, 10);
+      if (!result.amount || result.amount <= 0) {
+        showToast('금액 파싱 실패. 직접 입력해주세요', 'warn');
+        return;
+      }
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(result.date)) {
+        result.date = formatDate(new Date());
+      }
+
+      window._parsedExpense = result;
+
+      document.getElementById('parsed-result').innerHTML = `
+        <div class="rounded-lg p-3 mb-3" style="background:var(--bg2);border:1px solid var(--border);">
+          <div class="flex justify-between py-1"><span class="text-xs" style="color:var(--text3)">금액</span>
+            <span class="mono font-bold" style="color:var(--green);">${formatKRW(result.amount)}</span></div>
+          <div class="flex justify-between py-1"><span class="text-xs" style="color:var(--text3)">가맹점</span>
+            <span class="text-sm">${escapeHtml(result.merchant)}</span></div>
+          <div class="flex justify-between py-1"><span class="text-xs" style="color:var(--text3)">카테고리</span>
+            <select id="sel-category" class="text-xs rounded px-2 py-0.5 mono"
+              style="background:var(--border);color:var(--text);border:none;">
+              ${db.categories().map(c => `<option value="${escapeHtml(c.name)}" ${c.name===result.category?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="flex justify-between py-1"><span class="text-xs" style="color:var(--text3)">날짜</span>
+            <input type="date" id="inp-date" value="${escapeHtml(result.date)}"
+              class="text-xs mono rounded px-2 py-0.5"
+              style="background:var(--border);color:var(--text);border:none;"></div>
+        </div>
+        <div class="rounded-lg px-3 py-2 mb-3 text-xs" style="background:#0d2a1f;border:1px solid #065f46;color:var(--green);">
+          ✦ ${escapeHtml(result.feedback)}
+        </div>
+        <div class="rounded-lg p-3 mb-3" style="background:var(--bg2);border:1px solid var(--border);">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm">더치페이</span>
+            <button id="btn-dutch" onclick="toggleDutch()"
+              class="rounded-full px-3 py-1 text-xs mono"
+              style="background:var(--border);color:var(--text3);">OFF</button>
+          </div>
+          <div id="dutch-detail" class="hidden">
+            <div class="flex items-center gap-2">
+              <span class="text-xs" style="color:var(--text2)">인원 수 (나 포함)</span>
+              <input type="number" id="inp-split" value="2" min="2" max="10"
+                class="w-16 rounded px-2 py-1 text-xs mono"
+                style="background:var(--bg);border:1px solid var(--border);color:var(--text);"
+                oninput="updateDutchCalc()">
+              <span class="text-xs" style="color:var(--text3)">명</span>
+            </div>
+            <div class="mt-2 text-xs mono" style="color:var(--green);" id="dutch-my-amount"></div>
+          </div>
+        </div>
+        <button onclick="saveExpense()"
+          class="w-full rounded-lg py-2.5 text-sm font-bold"
+          style="background:var(--green);color:#0f172a;">저장</button>`;
+    }
+
+    let _dutchOn = false;
+    function toggleDutch() {
+      _dutchOn = !_dutchOn;
+      const btn = document.getElementById('btn-dutch');
+      const detail = document.getElementById('dutch-detail');
+      btn.textContent = _dutchOn ? 'ON' : 'OFF';
+      btn.style.background = _dutchOn ? 'var(--green)' : 'var(--border)';
+      btn.style.color = _dutchOn ? '#0f172a' : 'var(--text3)';
+      detail.classList.toggle('hidden', !_dutchOn);
+      if (_dutchOn) updateDutchCalc();
+    }
+
+    function updateDutchCalc() {
+      const split = Math.max(2, parseInt(document.getElementById('inp-split')?.value) || 2);
+      const amount = window._parsedExpense?.amount || 0;
+      const myAmt = Math.round(amount / split);
+      const elem = document.getElementById('dutch-my-amount');
+      if (elem) elem.textContent = `내 부담: ${formatKRW(myAmt)} (${formatKRW(amount)} ÷ ${split})`;
+    }
+
+    function saveExpense() {
+      const parsed = window._parsedExpense;
+      if (!parsed) return;
+
+      const amount   = parsed.amount;
+      const split    = _dutchOn ? Math.max(2, parseInt(document.getElementById('inp-split').value) || 2) : 1;
+      const myAmount = Math.round(amount / split);
+
+      const expense = {
+        id:         genId(),
+        date:       document.getElementById('inp-date').value || formatDate(new Date()),
+        amount,
+        myAmount,
+        merchant:   parsed.merchant,
+        category:   document.getElementById('sel-category').value,
+        memo:       '',
+        source:     'sms',
+        isDutch:    _dutchOn,
+        splitCount: split,
+      };
+
+      const expenses = db.expenses();
+      expenses.push(expense);
+      db.saveExpenses(expenses);
+
+      window._parsedExpense = null;
+      _dutchOn = false;
+      showToast('지출 저장됨');
+      switchTab('home');
+    }
+
+    initStorage();
+    switchTab('home');
+  </script>
+</body>
+</html>

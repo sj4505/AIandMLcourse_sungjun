@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}연구분야 - 부산대학교 물리학과{% endblock %}
+
+{% block content %}
+
+<!-- Page Hero -->
+<section class="page-hero pt-32 pb-20">
+  <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+    <span class="text-pnu-gold text-sm font-mono tracking-widest uppercase" data-aos="fade-down">Research</span>
+    <h1 class="text-5xl md:text-7xl font-black text-white mt-3" data-aos="fade-up" data-aos-delay="100">연구 분야</h1>
+    <p class="text-gray-300 text-lg mt-4 max-w-2xl mx-auto" data-aos="fade-up" data-aos-delay="200">
+      6개 핵심 연구 분야에서 자연의 근본 원리를 탐구하며<br/>세계 수준의 연구 성과를 만들어갑니다
+    </p>
+  </div>
+</section>
+
+<!-- Research Overview Cards -->
+<section class="py-20 bg-gray-950">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-20">
+      {% set icons = {
+        'atom': 'fas fa-atom', 'microscope': 'fas fa-microscope',
+        'lightbulb': 'fas fa-lightbulb', 'radiation': 'fas fa-radiation',
+        'star': 'fas fa-star', 'cpu': 'fas fa-microchip',
+      } %}
+      {% for area in research_areas %}
+      <a href="#{{ area.id }}" class="group flex flex-col items-center gap-3 p-4 rounded-xl bg-white/3 border border-white/5 hover:border-pnu-blue/40 transition-all duration-300 hover:-translate-y-1 text-center" data-aos="zoom-in" data-aos-delay="{{ loop.index0 * 60 }}">
+        <div class="w-12 h-12 bg-gradient-to-br {{ area.color }} rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+          <i class="{{ icons.get(area.icon,'fas fa-atom') }} text-white text-lg"></i>
+        </div>
+        <span class="text-gray-300 text-xs font-medium leading-tight">{{ area.name }}</span>
+      </a>
+      {% endfor %}
+    </div>
+
+    <!-- Detailed Research Areas -->
+    <div class="space-y-8">
+      {% for area in research_areas %}
+      <div id="{{ area.id }}" class="rounded-2xl border border-white/5 overflow-hidden" data-aos="fade-up" data-aos-delay="{{ loop.index0 * 60 }}">
+
+        <!-- Accordion Header -->
+        <button
+          data-accordion="{{ loop.index }}"
+          class="w-full flex items-center justify-between p-7 bg-white/3 hover:bg-white/5 transition-colors text-left group"
+        >
+          <div class="flex items-center gap-5">
+            <div class="w-14 h-14 bg-gradient-to-br {{ area.color }} rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+              <i class="{{ icons.get(area.icon,'fas fa-atom') }} text-white text-xl"></i>
+            </div>
+            <div>
+              <h3 class="text-white font-bold text-xl group-hover:text-pnu-gold transition-colors">{{ area.name }}</h3>
+              <p class="text-gray-500 text-sm font-mono">{{ area.name_en }}</p>
+            </div>
+          </div>
+          <i class="fas fa-chevron-down text-gray-400 text-lg transition-transform duration-300" data-icon></i>
+        </button>
+
+        <!-- Accordion Panel -->
+        <div id="panel-{{ loop.index }}" class="accordion-panel bg-gray-900/50">
+          <div class="p-7 pt-0 mt-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+              <!-- Description -->
+              <div class="lg:col-span-2">
+                <h4 class="text-white font-semibold mb-3 flex items-center gap-2">
+                  <span class="w-1 h-4 bg-pnu-blue rounded-full inline-block"></span>
+                  연구 개요
+                </h4>
+                <p class="text-gray-300 leading-relaxed text-sm mb-6">{{ area.description }}</p>
+
+                <h4 class="text-white font-semibold mb-3 flex items-center gap-2">
+                  <span class="w-1 h-4 bg-pnu-gold rounded-full inline-block"></span>
+                  주요 연구 주제
+                </h4>
+                <div class="flex flex-wrap gap-2">
+                  {% for kw in area.keywords %}
+                  <span class="px-3 py-1.5 bg-pnu-navy/40 border border-pnu-blue/20 rounded-full text-pnu-blue text-sm">
+                    {{ kw }}
+                  </span>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <!-- Stats -->
+              <div class="space-y-4">
+                {% for stat_label, stat_val in [('연구실 수', '2~3개'), ('참여 교수', '3~4명'), ('대학원생', '15~20명')] %}
+                <div class="p-4 rounded-xl bg-white/3 border border-white/5">
+                  <div class="text-gray-500 text-xs mb-1">{{ stat_label }}</div>
+                  <div class="text-white font-bold text-lg font-mono">{{ stat_val }}</div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+
+<!-- Research Achievement Banner -->
+<section class="py-16 bg-gradient-to-br from-gray-900 to-pnu-navy/30 border-t border-white/5">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-12" data-aos="fade-up">
+      <h2 class="text-3xl font-black text-white">연구 성과</h2>
+      <p class="text-gray-400 mt-2">세계 유수 저널에 게재된 연구 성과</p>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+      {% for val, lbl, sub in [
+        ('500+', 'SCI 논문', '최근 5년'),
+        ('50+', 'Nature/Science', '최상위 저널'),
+        ('30+', '국제 특허', '출원/등록'),
+        ('₩100억+', '연구비', '연간 수주'),
+      ] %}
+      <div class="text-center p-6 rounded-xl bg-white/3 border border-white/5" data-aos="zoom-in" data-aos-delay="{{ loop.index0 * 80 }}">
+        <div class="text-3xl font-black text-pnu-gold font-mono mb-2">{{ val }}</div>
+        <div class="text-white font-semibold text-sm">{{ lbl }}</div>
+        <div class="text-gray-500 text-xs mt-1">{{ sub }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% endblock %}
