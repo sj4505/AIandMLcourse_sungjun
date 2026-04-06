@@ -440,3 +440,143 @@ class Lab2Tab(BaseLabTab):
         fig1.tight_layout()
         progress_cb(100)
         return [fig1]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Lab 3: 과적합 vs 과소적합
+# ══════════════════════════════════════════════════════════════════════
+
+class Lab3Tab(BaseLabTab):
+    """Lab 3: Overfitting vs Underfitting"""
+
+    def _build_param_panel(self, form: QFormLayout):
+        self._n_train = QSpinBox()
+        self._n_train.setRange(30, 500)
+        self._n_train.setSingleStep(10)
+        self._n_train.setValue(100)
+        form.addRow("학습 샘플:", self._n_train)
+
+        self._noise = QDoubleSpinBox()
+        self._noise.setRange(0.05, 1.0)
+        self._noise.setSingleStep(0.05)
+        self._noise.setDecimals(2)
+        self._noise.setValue(0.3)
+        form.addRow("노이즈:", self._noise)
+
+        self._epochs = QSpinBox()
+        self._epochs.setRange(50, 1000)
+        self._epochs.setSingleStep(50)
+        self._epochs.setValue(200)
+        form.addRow("Epochs:", self._epochs)
+
+    def _collect_params(self) -> dict:
+        return {
+            "n_train": self._n_train.value(),
+            "noise": self._noise.value(),
+            "epochs": self._epochs.value(),
+        }
+
+    def _task_fn(self, params, progress_cb, log_cb):
+        from tensorflow import keras
+
+        n_train = params["n_train"]
+        noise = params["noise"]
+        epochs = params["epochs"]
+
+        # 데이터
+        x_tr = np.random.uniform(-2, 2, n_train).reshape(-1, 1)
+        y_tr = overfitting_true_function(x_tr) + np.random.normal(0, noise, (n_train, 1))
+        x_val = np.random.uniform(-2, 2, 50).reshape(-1, 1)
+        y_val = overfitting_true_function(x_val) + np.random.normal(0, noise, (50, 1))
+        x_test = np.linspace(-2, 2, 200).reshape(-1, 1)
+        y_test = overfitting_true_function(x_test)
+
+        model_defs = {
+            "Underfit [4]": keras.Sequential([
+                keras.layers.Input(shape=(1,)),
+                keras.layers.Dense(4, activation="relu"),
+                keras.layers.Dense(1),
+            ]),
+            "Good Fit [32,16]": keras.Sequential([
+                keras.layers.Input(shape=(1,)),
+                keras.layers.Dense(32, activation="relu"),
+                keras.layers.Dropout(0.2),
+                keras.layers.Dense(16, activation="relu"),
+                keras.layers.Dropout(0.2),
+                keras.layers.Dense(1),
+            ]),
+            "Overfit [256,128,64,32]": keras.Sequential([
+                keras.layers.Input(shape=(1,)),
+                keras.layers.Dense(256, activation="relu"),
+                keras.layers.Dense(128, activation="relu"),
+                keras.layers.Dense(64, activation="relu"),
+                keras.layers.Dense(32, activation="relu"),
+                keras.layers.Dense(1),
+            ]),
+        }
+
+        histories = {}
+        predictions = {}
+        colors = {"Underfit [4]": "blue", "Good Fit [32,16]": "green", "Overfit [256,128,64,32]": "red"}
+        total = len(model_defs) * epochs
+        done = 0
+
+        for name, model in model_defs.items():
+            model.compile(optimizer=keras.optimizers.Adam(0.001), loss="mse")
+
+            def make_cb(n=name):
+                nonlocal done
+                def on_epoch_end(ep, logs):
+                    nonlocal done
+                    done += 1
+                    progress_cb(int(done / total * 90))
+                return keras.callbacks.LambdaCallback(on_epoch_end=on_epoch_end)
+
+            h = model.fit(
+                x_tr, y_tr,
+                validation_data=(x_val, y_val),
+                epochs=epochs,
+                batch_size=16,
+                verbose=0,
+                callbacks=[make_cb()],
+            )
+            histories[name] = h
+            predictions[name] = model.predict(x_test, verbose=0)
+            t_mse = float(np.mean((predictions[name] - y_test) ** 2))
+            log_cb(f"{name}: Train={h.history['loss'][-1]:.4f} Val={h.history['val_loss'][-1]:.4f} TestMSE={t_mse:.4f}")
+
+        progress_cb(92)
+
+        # Figure 1: 예측 비교
+        fig1 = Figure(figsize=(12, 4))
+        for i, (name, y_pred) in enumerate(predictions.items()):
+            ax = fig1.add_subplot(1, 3, i + 1)
+            ax.scatter(x_tr, y_tr, alpha=0.4, s=20, color="gray", label="Train data")
+            ax.plot(x_test, y_test, "k-", linewidth=2, label="True", alpha=0.7)
+            ax.plot(x_test, y_pred, color=colors[name], linestyle="--", linewidth=2, label=name)
+            ax.set_title(name, fontweight="bold")
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
+            ax.legend(fontsize=8)
+            ax.grid(True, alpha=0.3)
+        fig1.suptitle("과적합 vs 과소적합 비교", fontsize=13, fontweight="bold")
+        fig1.tight_layout()
+
+        # Figure 2: 학습 곡선
+        fig2 = Figure(figsize=(12, 4))
+        for i, name in enumerate(model_defs.keys()):
+            ax = fig2.add_subplot(1, 3, i + 1)
+            h = histories[name]
+            ax.plot(h.history["loss"], color=colors[name], linestyle="-", linewidth=2, label="Train")
+            ax.plot(h.history["val_loss"], color=colors[name], linestyle="--", linewidth=2, label="Val")
+            ax.set_title(name, fontweight="bold")
+            ax.set_xlabel("Epoch")
+            ax.set_ylabel("MSE")
+            ax.legend(fontsize=8)
+            ax.grid(True, alpha=0.3)
+            ax.set_yscale("log")
+        fig2.suptitle("학습 곡선 (Train vs Val Loss)", fontsize=13, fontweight="bold")
+        fig2.tight_layout()
+
+        progress_cb(100)
+        return [fig1, fig2]
