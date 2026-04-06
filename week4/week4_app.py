@@ -315,3 +315,128 @@ class Lab1Tab(BaseLabTab):
 
         progress_cb(100)
         return [fig1]
+
+# ══════════════════════════════════════════════════════════════════════
+# Lab 2: 포물선 운동 회귀
+# ══════════════════════════════════════════════════════════════════════
+
+class Lab2Tab(BaseLabTab):
+    """Lab 2: Projectile Motion Regression"""
+
+    def _build_param_panel(self, form: QFormLayout):
+        self._n_samples = QSpinBox()
+        self._n_samples.setRange(500, 5000)
+        self._n_samples.setSingleStep(500)
+        self._n_samples.setValue(2000)
+        form.addRow("학습 샘플:", self._n_samples)
+
+        self._epochs = QSpinBox()
+        self._epochs.setRange(20, 500)
+        self._epochs.setSingleStep(20)
+        self._epochs.setValue(100)
+        form.addRow("Epochs:", self._epochs)
+
+        self._v0 = QDoubleSpinBox()
+        self._v0.setRange(10.0, 50.0)
+        self._v0.setSingleStep(5.0)
+        self._v0.setValue(30.0)
+        form.addRow("초기속도 v₀ (m/s):", self._v0)
+
+        self._theta = QDoubleSpinBox()
+        self._theta.setRange(20.0, 70.0)
+        self._theta.setSingleStep(5.0)
+        self._theta.setValue(45.0)
+        form.addRow("발사각 θ (°):", self._theta)
+
+    def _collect_params(self) -> dict:
+        return {
+            "n_samples": self._n_samples.value(),
+            "epochs": self._epochs.value(),
+            "v0": self._v0.value(),
+            "theta": self._theta.value(),
+        }
+
+    def _task_fn(self, params, progress_cb, log_cb):
+        from tensorflow import keras
+
+        n_samples = params["n_samples"]
+        epochs = params["epochs"]
+        v0_test = params["v0"]
+        theta_test = params["theta"]
+
+        # 데이터 생성
+        X_train, Y_train = generate_projectile_data(n_samples, noise_level=0.5)
+        log_cb(f"학습 데이터: {X_train.shape[0]} 샘플")
+        progress_cb(5)
+
+        # 모델
+        model = keras.Sequential([
+            keras.layers.Input(shape=(3,)),
+            keras.layers.Dense(128, activation="relu"),
+            keras.layers.Dropout(0.1),
+            keras.layers.Dense(64, activation="relu"),
+            keras.layers.Dropout(0.1),
+            keras.layers.Dense(32, activation="relu"),
+            keras.layers.Dense(2, activation="linear"),
+        ])
+        model.compile(optimizer=keras.optimizers.Adam(0.001), loss="mse", metrics=["mae"])
+
+        history = model.fit(
+            X_train, Y_train,
+            validation_split=0.2,
+            epochs=epochs,
+            batch_size=32,
+            verbose=0,
+            callbacks=[keras.callbacks.LambdaCallback(
+                on_epoch_end=lambda ep, _: progress_cb(5 + int(ep / epochs * 85))
+            )],
+        )
+        progress_cb(90)
+
+        final_loss = history.history["loss"][-1]
+        final_val = history.history["val_loss"][-1]
+        log_cb(f"Train MSE: {final_loss:.4f} / Val MSE: {final_val:.4f}")
+
+        # 테스트 궤적 예측
+        theta_rad = np.deg2rad(theta_test)
+        t_max = 2 * v0_test * np.sin(theta_rad) / _G
+        t = np.linspace(0, t_max, 60)
+        X_input = np.column_stack([
+            np.full(60, v0_test), np.full(60, theta_test), t
+        ])
+        pred = model.predict(X_input, verbose=0)
+        x_pred, y_pred = pred[:, 0], pred[:, 1]
+        x_true = v0_test * np.cos(theta_rad) * t
+        y_true = v0_test * np.sin(theta_rad) * t - 0.5 * _G * t ** 2
+
+        mse_traj = float(np.mean((x_pred - x_true) ** 2 + (y_pred - y_true) ** 2))
+        log_cb(f"궤적 MSE: {mse_traj:.4f}")
+        progress_cb(95)
+
+        # Figure 1: 궤적
+        fig1 = Figure(figsize=(10, 4))
+        ax1 = fig1.add_subplot(121)
+        ax1.plot(x_true, y_true, "b-", linewidth=2.5, label="True", alpha=0.7)
+        ax1.plot(x_pred, y_pred, "r--", linewidth=2, label="NN Pred")
+        ax1.set_xlim(left=0)
+        ax1.set_ylim(bottom=0)
+        ax1.set_xlabel("x (m)")
+        ax1.set_ylabel("y (m)")
+        ax1.set_title(f"v₀={v0_test} m/s, θ={theta_test}°\nMSE: {mse_traj:.4f}", fontweight="bold")
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+
+        ax2 = fig1.add_subplot(122)
+        ax2.plot(history.history["loss"], "b-", linewidth=2, label="Train")
+        ax2.plot(history.history["val_loss"], "r--", linewidth=2, label="Val")
+        ax2.set_xlabel("Epoch")
+        ax2.set_ylabel("MSE")
+        ax2.set_title("Training History", fontweight="bold")
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        ax2.set_yscale("log")
+
+        fig1.suptitle("Projectile Motion Regression", fontsize=13, fontweight="bold")
+        fig1.tight_layout()
+        progress_cb(100)
+        return [fig1]
