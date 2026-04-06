@@ -64,3 +64,143 @@ def lab1_get_function(name: str):
     if name not in fns:
         raise ValueError(f"Unknown function: {name}")
     return fns[name]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Worker Thread
+# ══════════════════════════════════════════════════════════════════════
+
+class TrainingWorker(QThread):
+    progress = Signal(int)
+    log_message = Signal(str)
+    finished = Signal(object)   # list[Figure]
+    error = Signal(str)
+
+    def __init__(self, task_fn, params: dict):
+        super().__init__()
+        self._task_fn = task_fn
+        self._params = params
+
+    def run(self):
+        try:
+            figures = self._task_fn(self._params, self.progress.emit, self.log_message.emit)
+            self.finished.emit(figures)
+        except Exception as e:
+            import traceback
+            self.error.emit(traceback.format_exc())
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Base Lab Tab
+# ══════════════════════════════════════════════════════════════════════
+
+class BaseLabTab(QWidget):
+    run_started = Signal()
+    run_finished = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._worker = None
+        self._canvas_list: list[FigureCanvas] = []
+        self._setup_ui()
+
+    def _build_param_panel(self, form: QFormLayout):
+        raise NotImplementedError
+
+    def _collect_params(self) -> dict:
+        raise NotImplementedError
+
+    def _task_fn(self, params: dict, progress_cb, log_cb) -> list:
+        raise NotImplementedError
+
+    def _setup_ui(self):
+        splitter = QSplitter(Qt.Horizontal, self)
+
+        # 왼쪽 파라미터 패널
+        left = QWidget()
+        left.setFixedWidth(240)
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(8, 8, 8, 8)
+        form = QFormLayout()
+        form.setSpacing(8)
+        self._build_param_panel(form)
+        left_layout.addLayout(form)
+        left_layout.addSpacing(12)
+        self._run_btn = QPushButton("▶  실행")
+        self._run_btn.setFont(QFont("", 11, QFont.Bold))
+        self._run_btn.setMinimumHeight(36)
+        self._run_btn.clicked.connect(self._on_run)
+        left_layout.addWidget(self._run_btn)
+        left_layout.addStretch()
+
+        # 오른쪽 결과 패널
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(4, 4, 4, 4)
+        self._progress = QProgressBar()
+        self._progress.setRange(0, 100)
+        self._progress.setMaximumHeight(18)
+        right_layout.addWidget(self._progress)
+        self._log = QTextEdit()
+        self._log.setReadOnly(True)
+        self._log.setMaximumHeight(90)
+        self._log.setFont(QFont("Consolas", 9))
+        right_layout.addWidget(self._log)
+
+        # 스크롤 가능한 캔버스 영역
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        canvas_container = QWidget()
+        self._canvas_area = QVBoxLayout(canvas_container)
+        self._canvas_area.setAlignment(Qt.AlignTop)
+        scroll.setWidget(canvas_container)
+        right_layout.addWidget(scroll)
+
+        splitter.addWidget(left)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(1, 1)
+
+        main = QVBoxLayout(self)
+        main.setContentsMargins(0, 0, 0, 0)
+        main.addWidget(splitter)
+
+    def _on_run(self):
+        if self._worker and self._worker.isRunning():
+            return
+        try:
+            params = self._collect_params()
+        except ValueError as e:
+            QMessageBox.warning(self, "파라미터 오류", str(e))
+            return
+        self._log.clear()
+        self._progress.setValue(0)
+        self._clear_canvases()
+        self.run_started.emit()
+        self._run_btn.setEnabled(False)
+        self._worker = TrainingWorker(self._task_fn, params)
+        self._worker.progress.connect(self._progress.setValue)
+        self._worker.log_message.connect(self._log.append)
+        self._worker.finished.connect(self._on_finished)
+        self._worker.error.connect(self._on_error)
+        self._worker.start()
+
+    def _on_finished(self, figures):
+        for fig in figures:
+            canvas = FigureCanvas(fig)
+            canvas.setMinimumHeight(350)
+            self._canvas_area.addWidget(canvas)
+            self._canvas_list.append(canvas)
+        self._progress.setValue(100)
+        self._run_btn.setEnabled(True)
+        self.run_finished.emit()
+
+    def _on_error(self, msg):
+        QMessageBox.critical(self, "오류 발생", msg)
+        self._run_btn.setEnabled(True)
+        self.run_finished.emit()
+
+    def _clear_canvases(self):
+        for canvas in self._canvas_list:
+            self._canvas_area.removeWidget(canvas)
+            canvas.deleteLater()
+        self._canvas_list.clear()
