@@ -704,3 +704,33 @@ class Lab4Tab(BaseLabTab):
         fig1.tight_layout()
         progress_cb(100)
         return [fig1]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Main Window
+# ══════════════════════════════════════════════════════════════════════
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Week 4 — Physics ML Experiments")
+        self.resize(1100, 750)
+
+        tabs = QTabWidget()
+        tabs.addTab(Lab1Tab(), "Lab 1: 1D 함수 근사")
+        tabs.addTab(Lab2Tab(), "Lab 2: 포물선 운동")
+        tabs.addTab(Lab3Tab(), "Lab 3: 과적합/과소적합")
+        tabs.addTab(Lab4Tab(), "Lab 4: 진자 주기")
+        self.setCentralWidget(tabs)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Entry Point
+# ══════════════════════════════════════════════════════════════════════
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    app.setFont(QFont("Segoe UI", 10))
+    win = MainWindow()
+    win.show()
+    sys.exit(app.exec())
