@@ -580,3 +580,127 @@ class Lab3Tab(BaseLabTab):
 
         progress_cb(100)
         return [fig1, fig2]
+
+# ══════════════════════════════════════════════════════════════════════
+# Lab 4: 진자 주기 예측
+# ══════════════════════════════════════════════════════════════════════
+
+class Lab4Tab(BaseLabTab):
+    """Lab 4: Pendulum Period Prediction"""
+
+    def _build_param_panel(self, form: QFormLayout):
+        self._n_samples = QSpinBox()
+        self._n_samples.setRange(500, 5000)
+        self._n_samples.setSingleStep(500)
+        self._n_samples.setValue(2000)
+        form.addRow("학습 샘플:", self._n_samples)
+
+        self._epochs = QSpinBox()
+        self._epochs.setRange(20, 500)
+        self._epochs.setSingleStep(20)
+        self._epochs.setValue(100)
+        form.addRow("Epochs:", self._epochs)
+
+        self._L = QDoubleSpinBox()
+        self._L.setRange(0.1, 5.0)
+        self._L.setSingleStep(0.1)
+        self._L.setDecimals(2)
+        self._L.setValue(1.0)
+        form.addRow("진자 길이 L (m):", self._L)
+
+        self._theta0 = QDoubleSpinBox()
+        self._theta0.setRange(5.0, 80.0)
+        self._theta0.setSingleStep(5.0)
+        self._theta0.setValue(30.0)
+        form.addRow("초기 각도 θ₀ (°):", self._theta0)
+
+    def _collect_params(self) -> dict:
+        return {
+            "n_samples": self._n_samples.value(),
+            "epochs": self._epochs.value(),
+            "L": self._L.value(),
+            "theta0": self._theta0.value(),
+        }
+
+    def _task_fn(self, params, progress_cb, log_cb):
+        from tensorflow import keras
+
+        n_samples = params["n_samples"]
+        epochs = params["epochs"]
+        L_test = params["L"]
+        theta0_test = params["theta0"]
+
+        # 데이터 생성
+        L_arr = np.random.uniform(0.5, 3.0, n_samples)
+        theta_arr = np.random.uniform(5, 80, n_samples)
+        T_true = np.array([calculate_true_period(l, t) for l, t in zip(L_arr, theta_arr)])
+        T_noisy = T_true * (1 + np.random.normal(0, 0.01, n_samples))
+        X = np.column_stack([L_arr, theta_arr])
+        Y = T_noisy.reshape(-1, 1)
+        log_cb(f"학습 데이터: {n_samples} 샘플")
+        progress_cb(5)
+
+        # 모델
+        model = keras.Sequential([
+            keras.layers.Input(shape=(2,)),
+            keras.layers.Dense(64, activation="relu"),
+            keras.layers.Dropout(0.1),
+            keras.layers.Dense(32, activation="relu"),
+            keras.layers.Dropout(0.1),
+            keras.layers.Dense(16, activation="relu"),
+            keras.layers.Dense(1, activation="linear"),
+        ])
+        model.compile(optimizer=keras.optimizers.Adam(0.001), loss="mse", metrics=["mae"])
+
+        history = model.fit(
+            X, Y,
+            validation_split=0.2,
+            epochs=epochs,
+            batch_size=32,
+            verbose=0,
+            callbacks=[keras.callbacks.LambdaCallback(
+                on_epoch_end=lambda ep, _: progress_cb(5 + int(ep / epochs * 80))
+            )],
+        )
+        progress_cb(87)
+
+        # 테스트: 다양한 각도
+        angles = np.linspace(5, 80, 50)
+        X_input = np.column_stack([np.full(50, L_test), angles])
+        T_pred = model.predict(X_input, verbose=0).flatten()
+        T_actual = np.array([calculate_true_period(L_test, a) for a in angles])
+        mape = float(np.mean(np.abs((T_pred - T_actual) / T_actual)) * 100)
+        log_cb(f"MAPE: {mape:.2f}%")
+        progress_cb(93)
+
+        # 단일 포인트 예측
+        T_single_pred = float(model.predict(np.array([[L_test, theta0_test]]), verbose=0)[0, 0])
+        T_single_true = calculate_true_period(L_test, theta0_test)
+        log_cb(f"L={L_test}m, θ={theta0_test}° → T_pred={T_single_pred:.4f}s, T_true={T_single_true:.4f}s")
+
+        # Figure 1: 주기 예측
+        fig1 = Figure(figsize=(10, 4))
+        ax1 = fig1.add_subplot(121)
+        ax1.plot(angles, T_actual, "b-", linewidth=2.5, label="True Period", alpha=0.7)
+        ax1.plot(angles, T_pred, "r--", linewidth=2, label="NN Prediction")
+        ax1.axvline(theta0_test, color="gray", linestyle=":", alpha=0.7)
+        ax1.set_xlabel("Initial Angle (°)")
+        ax1.set_ylabel("Period (s)")
+        ax1.set_title(f"L={L_test} m  —  MAPE: {mape:.2f}%", fontweight="bold")
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+
+        ax2 = fig1.add_subplot(122)
+        ax2.plot(history.history["loss"], "b-", linewidth=2, label="Train")
+        ax2.plot(history.history["val_loss"], "r--", linewidth=2, label="Val")
+        ax2.set_xlabel("Epoch")
+        ax2.set_ylabel("MSE")
+        ax2.set_title("Training History", fontweight="bold")
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        ax2.set_yscale("log")
+
+        fig1.suptitle("진자 주기 예측", fontsize=13, fontweight="bold")
+        fig1.tight_layout()
+        progress_cb(100)
+        return [fig1]
