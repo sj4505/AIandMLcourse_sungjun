@@ -278,8 +278,18 @@ class Lab1Tab(BaseLabTab):
 
         # 직접 epoch 루프로 진행률 보고
         batch_size = 32
+        losses = []
+        n = len(x_train)
         for epoch in range(epochs):
-            model.train_on_batch(x_train, y_train)
+            idx = np.random.permutation(n)
+            epoch_loss = 0.0
+            n_batches = 0
+            for start in range(0, n, batch_size):
+                batch_idx = idx[start:start + batch_size]
+                loss = model.train_on_batch(x_train[batch_idx], y_train[batch_idx])
+                epoch_loss += float(loss)
+                n_batches += 1
+            losses.append(epoch_loss / max(n_batches, 1))
             if epoch % max(1, epochs // 100) == 0:
                 progress_cb(int(epoch / epochs * 90))
 
@@ -289,9 +299,9 @@ class Lab1Tab(BaseLabTab):
         log_cb(f"완료 — MSE: {mse:.6f}, MAE: {mae:.6f}")
         progress_cb(95)
 
-        # Figure 1: 함수 근사 + 오차
-        fig1 = Figure(figsize=(10, 4))
-        ax1 = fig1.add_subplot(121)
+        # Figure 1: 함수 근사 + 오차 + 학습 곡선
+        fig1 = Figure(figsize=(15, 4))
+        ax1 = fig1.add_subplot(131)
         ax1.plot(x_test, y_test, "b-", linewidth=2, label="True", alpha=0.7)
         ax1.plot(x_test, y_pred, "r--", linewidth=2, label="NN Prediction")
         ax1.scatter(x_train[::10], y_train[::10], c="black", s=15, alpha=0.3)
@@ -301,14 +311,22 @@ class Lab1Tab(BaseLabTab):
         ax1.legend()
         ax1.grid(True, alpha=0.3)
 
-        ax2 = fig1.add_subplot(122)
-        error = np.abs(y_pred - y_test)
-        ax2.plot(x_test, error, "r-", linewidth=1.5)
-        ax2.fill_between(x_test.flatten(), 0, error.flatten(), color="r", alpha=0.3)
-        ax2.set_title(f"Absolute Error (Max: {error.max():.4f})", fontweight="bold")
-        ax2.set_xlabel("x")
-        ax2.set_ylabel("|error|")
+        ax2 = fig1.add_subplot(132)
+        ax2.plot(losses, "g-", linewidth=1.5)
+        ax2.set_title("Training Loss", fontweight="bold")
+        ax2.set_xlabel("Epoch")
+        ax2.set_ylabel("MSE")
+        ax2.set_yscale("log")
         ax2.grid(True, alpha=0.3)
+
+        ax3 = fig1.add_subplot(133)
+        error = np.abs(y_pred - y_test)
+        ax3.plot(x_test, error, "r-", linewidth=1.5)
+        ax3.fill_between(x_test.flatten(), 0, error.flatten(), color="r", alpha=0.3)
+        ax3.set_title(f"Absolute Error (Max: {error.max():.4f})", fontweight="bold")
+        ax3.set_xlabel("x")
+        ax3.set_ylabel("|error|")
+        ax3.grid(True, alpha=0.3)
 
         fig1.suptitle("1D 함수 근사", fontsize=13, fontweight="bold")
         fig1.tight_layout()
@@ -524,7 +542,7 @@ class Lab3Tab(BaseLabTab):
         for name, model in model_defs.items():
             model.compile(optimizer=keras.optimizers.Adam(0.001), loss="mse")
 
-            def make_cb(n=name):
+            def make_cb():
                 nonlocal done
                 def on_epoch_end(ep, logs):
                     nonlocal done
@@ -722,6 +740,15 @@ class MainWindow(QMainWindow):
         tabs.addTab(Lab3Tab(), "Lab 3: 과적합/과소적합")
         tabs.addTab(Lab4Tab(), "Lab 4: 진자 주기")
         self.setCentralWidget(tabs)
+
+    def closeEvent(self, event):
+        tabs = self.centralWidget()
+        for i in range(tabs.count()):
+            tab = tabs.widget(i)
+            if hasattr(tab, "_worker") and tab._worker and tab._worker.isRunning():
+                tab._worker.quit()
+                tab._worker.wait(3000)
+        event.accept()
 
 
 # ══════════════════════════════════════════════════════════════════════
