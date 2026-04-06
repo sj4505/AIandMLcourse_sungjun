@@ -204,3 +204,114 @@ class BaseLabTab(QWidget):
             self._canvas_area.removeWidget(canvas)
             canvas.deleteLater()
         self._canvas_list.clear()
+
+# ══════════════════════════════════════════════════════════════════════
+# Lab 1: 1D 함수 근사
+# ══════════════════════════════════════════════════════════════════════
+
+class Lab1Tab(BaseLabTab):
+    """Lab 1: Universal Approximation — 1D 함수 근사"""
+
+    def _build_param_panel(self, form: QFormLayout):
+        self._func = QComboBox()
+        self._func.addItems(["sin(x)", "cos(x)+0.5sin(2x)", "x·sin(x)"])
+        form.addRow("함수:", self._func)
+
+        self._arch = QComboBox()
+        self._arch.addItems(["Small [32]", "Medium [64,64]", "Large [128,128,64]"])
+        self._arch.setCurrentIndex(2)
+        form.addRow("네트워크:", self._arch)
+
+        self._epochs = QSpinBox()
+        self._epochs.setRange(100, 10000)
+        self._epochs.setSingleStep(500)
+        self._epochs.setValue(3000)
+        form.addRow("Epochs:", self._epochs)
+
+        self._lr = QDoubleSpinBox()
+        self._lr.setRange(0.0001, 0.1)
+        self._lr.setSingleStep(0.001)
+        self._lr.setDecimals(4)
+        self._lr.setValue(0.01)
+        form.addRow("Learning Rate:", self._lr)
+
+    def _collect_params(self) -> dict:
+        arch_map = {
+            "Small [32]": [32],
+            "Medium [64,64]": [64, 64],
+            "Large [128,128,64]": [128, 128, 64],
+        }
+        return {
+            "func_name": self._func.currentText(),
+            "hidden_layers": arch_map[self._arch.currentText()],
+            "epochs": self._epochs.value(),
+            "lr": self._lr.value(),
+        }
+
+    def _task_fn(self, params, progress_cb, log_cb):
+        import tensorflow as tf
+        from tensorflow import keras
+
+        func_name = params["func_name"]
+        hidden_layers = params["hidden_layers"]
+        epochs = params["epochs"]
+        lr = params["lr"]
+
+        fn = lab1_get_function(func_name)
+        x_train = np.linspace(-2 * np.pi, 2 * np.pi, 200).reshape(-1, 1)
+        x_test = np.linspace(-2 * np.pi, 2 * np.pi, 400).reshape(-1, 1)
+        y_train = fn(x_train)
+        y_test = fn(x_test)
+
+        # 모델 구성
+        model = keras.Sequential()
+        model.add(keras.layers.Input(shape=(1,)))
+        for units in hidden_layers:
+            model.add(keras.layers.Dense(units, activation="tanh"))
+        model.add(keras.layers.Dense(1, activation="linear"))
+        model.compile(
+            optimizer=keras.optimizers.Adam(learning_rate=lr),
+            loss="mse",
+        )
+
+        log_cb(f"학습 시작: {func_name} / 구조: {hidden_layers}")
+
+        # 직접 epoch 루프로 진행률 보고
+        batch_size = 32
+        for epoch in range(epochs):
+            model.train_on_batch(x_train, y_train)
+            if epoch % max(1, epochs // 100) == 0:
+                progress_cb(int(epoch / epochs * 90))
+
+        y_pred = model.predict(x_test, verbose=0)
+        mse = float(np.mean((y_pred - y_test) ** 2))
+        mae = float(np.mean(np.abs(y_pred - y_test)))
+        log_cb(f"완료 — MSE: {mse:.6f}, MAE: {mae:.6f}")
+        progress_cb(95)
+
+        # Figure 1: 함수 근사 + 오차
+        fig1 = Figure(figsize=(10, 4))
+        ax1 = fig1.add_subplot(121)
+        ax1.plot(x_test, y_test, "b-", linewidth=2, label="True", alpha=0.7)
+        ax1.plot(x_test, y_pred, "r--", linewidth=2, label="NN Prediction")
+        ax1.scatter(x_train[::10], y_train[::10], c="black", s=15, alpha=0.3)
+        ax1.set_title(f"{func_name}\nMSE: {mse:.6f}", fontweight="bold")
+        ax1.set_xlabel("x")
+        ax1.set_ylabel("y")
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+
+        ax2 = fig1.add_subplot(122)
+        error = np.abs(y_pred - y_test)
+        ax2.plot(x_test, error, "r-", linewidth=1.5)
+        ax2.fill_between(x_test.flatten(), 0, error.flatten(), color="r", alpha=0.3)
+        ax2.set_title(f"Absolute Error (Max: {error.max():.4f})", fontweight="bold")
+        ax2.set_xlabel("x")
+        ax2.set_ylabel("|error|")
+        ax2.grid(True, alpha=0.3)
+
+        fig1.suptitle("1D 함수 근사", fontsize=13, fontweight="bold")
+        fig1.tight_layout()
+
+        progress_cb(100)
+        return [fig1]
