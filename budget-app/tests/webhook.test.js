@@ -1,9 +1,11 @@
 const crypto = require('crypto');
 
 // Supabase 클라이언트 모킹
-const mockUpdate = jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) });
+let mockEq;
+let mockUpdate;
+
 jest.mock('@supabase/supabase-js', () => ({
-  createClient: () => ({ from: () => ({ update: mockUpdate }) })
+  createClient: () => ({ from: () => ({ update: (...args) => mockUpdate(...args) }) })
 }));
 
 const handler = require('../api/webhook/polar');
@@ -40,10 +42,11 @@ function makeRequest(body, overrideSignature) {
 }
 
 beforeEach(() => {
+  mockEq     = jest.fn().mockResolvedValue({ error: null });
+  mockUpdate = jest.fn().mockReturnValue({ eq: mockEq });
   process.env.POLAR_WEBHOOK_SECRET = WEBHOOK_SECRET;
   process.env.SUPABASE_URL = 'https://test.supabase.co';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
-  mockUpdate.mockClear();
 });
 
 test('405 for non-POST method', async () => {

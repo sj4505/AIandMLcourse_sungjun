@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/webhook/polar.js": {
+      "bodyParser": false
+    }
+  }
+}
