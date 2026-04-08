@@ -39,6 +39,21 @@
 </head>
 <body class="flex flex-col" style="min-height:100dvh;">
 
+  <!-- ── AUTH OVERLAY ──────────────────────────────────────────── -->
+  <div id="auth-overlay"
+    style="display:none; position:fixed; inset:0; background:var(--bg); z-index:200;
+           flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:24px; text-align:center;">
+    <div class="mono" style="font-size:2.5rem;">₩</div>
+    <div style="font-size:1.25rem; font-weight:700;">가계부</div>
+    <p style="font-size:0.875rem; color:var(--text2);">Google 계정으로 로그인하세요</p>
+    <button onclick="signInWithGoogle()"
+      style="display:flex; align-items:center; gap:10px; padding:12px 24px;
+             border-radius:12px; background:#fff; color:#0f172a; font-weight:700; font-size:0.875rem; border:none; cursor:pointer;">
+      <img src="https://www.google.com/favicon.ico" width="18" height="18" alt="Google">
+      Google로 로그인
+    </button>
+  </div>
+
   <main id="main" class="flex-1 overflow-y-auto pb-16" style="-webkit-overflow-scrolling:touch;">
     <div id="tab-home"         class="tab-content active p-4"></div>
     <div id="tab-expense"      class="tab-content p-4"></div>
@@ -1105,8 +1120,80 @@ feedback은 오늘 예산 상황을 포함한 1문장 한국어 코멘트. 절�
       switchTab('home');
     }
 
-    initStorage();
-    switchTab('home');
+    // ── AUTH & INIT ──────────────────────────────────────────────────────
+
+    function showOverlay(id) {
+      ['auth-overlay', 'pay-overlay'].forEach(oid => {
+        const el = document.getElementById(oid);
+        if (el) el.style.display = (oid === id) ? 'flex' : 'none';
+      });
+    }
+
+    function hideOverlays() {
+      ['auth-overlay', 'pay-overlay'].forEach(oid => {
+        const el = document.getElementById(oid);
+        if (el) el.style.display = 'none';
+      });
+    }
+
+    async function signInWithGoogle() {
+      await _sbClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.href },
+      });
+    }
+
+    async function ensureUserRecord(user) {
+      const { data } = await _sbClient
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!data) {
+        await _sbClient.from('users').insert({ id: user.id, email: user.email });
+      }
+    }
+
+    async function getSubscriptionStatus(userId) {
+      const { data } = await _sbClient
+        .from('users')
+        .select('subscription_status')
+        .eq('id', userId)
+        .single();
+      return data?.subscription_status ?? 'inactive';
+    }
+
+    async function init() {
+      const { data: { session } } = await _sbClient.auth.getSession();
+
+      if (!session) {
+        showOverlay('auth-overlay');
+        return;
+      }
+
+      _currentUser = session.user;
+      await ensureUserRecord(session.user);
+
+      const status = await getSubscriptionStatus(session.user.id);
+      if (status !== 'active') {
+        showOverlay('pay-overlay');
+        return;
+      }
+
+      await initStorage();
+      hideOverlays();
+      switchTab('home');
+    }
+
+    // OAuth 리다이렉트 콜백 처리
+    _sbClient.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        _currentUser = session.user;
+        await init();
+      }
+    });
+
+    init();
   </script>
 </body>
 </html>
