@@ -21,7 +21,7 @@ function verifySignature(rawBody, headers, secret) {
   if (isNaN(ts) || Math.abs(now - ts) > 300) return false;
 
   const toSign = `${msgId}.${msgTimestamp}.${rawBody}`;
-  const secretBytes = Buffer.from(secret.replace(/^whsec_/, ''), 'base64');
+  const secretBytes = Buffer.from(secret.replace(/^(whsec_|polar_whs_)/, ''), 'base64');
   const computed = crypto
     .createHmac('sha256', secretBytes)
     .update(toSign)
