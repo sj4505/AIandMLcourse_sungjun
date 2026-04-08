@@ -106,9 +106,9 @@
     // ── SUPABASE CONFIG ────────────────────────────────────────────────
     // SUPABASE_URL, SUPABASE_ANON_KEY: 공개해도 안전 (anon key, RLS로 보호됨)
     // POLAR_CHECKOUT_URL: Polar 대시보드 → 상품 → Checkout URL
-    const SUPABASE_URL        = 'YOUR_SUPABASE_PROJECT_URL';
-    const SUPABASE_ANON_KEY   = 'YOUR_SUPABASE_ANON_KEY';
-    const POLAR_CHECKOUT_URL  = 'YOUR_POLAR_SANDBOX_CHECKOUT_URL';
+    const SUPABASE_URL        = 'https://rowzohuacewhvdulsftl.supabase.co';
+    const SUPABASE_ANON_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJvd3pvaHVhY2V3aHZkdWxzZnRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NTUyMjAsImV4cCI6MjA5MTIzMTIyMH0.807-3CyKgihOmLNOb9dXko-hiFMy5LsIwFv9s6nULuM';
+    const POLAR_CHECKOUT_URL  = 'https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_ozo9er5KYCx4rM5kNC9KNLaaaPmI7fwOf8JXK4U0i3n/redirect';
 
     const _sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let _currentUser = null;
