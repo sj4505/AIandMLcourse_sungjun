@@ -22,3 +22,10 @@ week11/
 week12/
 week13/
 week14/
+
+# Local env files
+.env.local
+.env.*.local
+
+# Node
+node_modules/

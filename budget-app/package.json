@@ -1,0 +1,14 @@
+{
+  "name": "budget-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "jest --testEnvironment node"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
