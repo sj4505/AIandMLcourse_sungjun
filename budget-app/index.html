@@ -54,6 +54,28 @@
     </button>
   </div>
 
+  <!-- ── PAY OVERLAY ──────────────────────────────────────────── -->
+  <div id="pay-overlay"
+    style="display:none; position:fixed; inset:0; background:var(--bg); z-index:200;
+           flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:24px; text-align:center;">
+    <div class="mono" style="font-size:2.5rem;">₩</div>
+    <div style="font-size:1.25rem; font-weight:700;">구독이 필요해요</div>
+    <p style="font-size:0.875rem; color:var(--text2);">첫 1개월은 무료로 사용할 수 있어요</p>
+    <button onclick="goToCheckout()"
+      style="padding:12px 28px; border-radius:12px; background:var(--green); color:#0f172a;
+             font-weight:700; font-size:0.875rem; border:none; cursor:pointer;">
+      무료로 시작하기 →
+    </button>
+    <button onclick="refreshSubscription()"
+      style="font-size:0.75rem; color:var(--text3); background:none; border:none; cursor:pointer; text-decoration:underline;">
+      이미 결제했어요 (새로고침)
+    </button>
+    <button onclick="handleLogout()"
+      style="font-size:0.75rem; color:var(--text3); background:none; border:none; cursor:pointer;">
+      다른 계정으로 로그인
+    </button>
+  </div>
+
   <main id="main" class="flex-1 overflow-y-auto pb-16" style="-webkit-overflow-scrolling:touch;">
     <div id="tab-home"         class="tab-content active p-4"></div>
     <div id="tab-expense"      class="tab-content p-4"></div>
@@ -1190,6 +1212,25 @@ feedback은 오늘 예산 상황을 포함한 1문장 한국어 코멘트. 절�
         switchTab('home');
       } finally {
         _initializing = false;
+      }
+    }
+
+    function goToCheckout() {
+      const email = _currentUser?.email ?? '';
+      const url = POLAR_CHECKOUT_URL +
+        (email ? '?customer_email=' + encodeURIComponent(email) : '');
+      window.location.href = url;
+    }
+
+    async function refreshSubscription() {
+      if (!_currentUser) { showOverlay('auth-overlay'); return; }
+      const status = await getSubscriptionStatus(_currentUser.id);
+      if (status === 'active') {
+        await initStorage();
+        hideOverlays();
+        switchTab('home');
+      } else {
+        showToast('아직 구독이 확인되지 않았어요. 잠시 후 다시 시도해주세요.', 'warn');
       }
     }
 
