@@ -13,12 +13,14 @@ function verifySignature(rawBody, headers, secret) {
   const msgId = headers['webhook-id'];
   const msgTimestamp = headers['webhook-timestamp'];
   const msgSignature = headers['webhook-signature'];
-  if (!msgId || !msgTimestamp || !msgSignature) return false;
+  console.log('[webhook] id:', msgId, 'ts:', msgTimestamp, 'sig:', msgSignature);
+  if (!msgId || !msgTimestamp || !msgSignature) { console.log('[webhook] missing headers'); return false; }
 
   // Fix 2: timestamp replay-window check
   const now = Math.floor(Date.now() / 1000);
   const ts  = parseInt(msgTimestamp, 10);
-  if (isNaN(ts) || Math.abs(now - ts) > 300) return false;
+  console.log('[webhook] now:', now, 'ts:', ts, 'diff:', Math.abs(now - ts));
+  if (isNaN(ts) || Math.abs(now - ts) > 300) { console.log('[webhook] timestamp fail'); return false; }
 
   const toSign = `${msgId}.${msgTimestamp}.${rawBody}`;
   const secretBytes = Buffer.from(secret.replace(/^(whsec_|polar_whs_)/, ''), 'base64');
@@ -27,11 +29,14 @@ function verifySignature(rawBody, headers, secret) {
     .update(toSign)
     .digest('base64');
 
+  console.log('[webhook] computed:', computed, 'rawBodyLen:', rawBody.length);
   return msgSignature.split(' ').some(sig => {
     const [version, val] = sig.split(',');
+    console.log('[webhook] version:', version, 'val:', val);
     // Fix 1: timing-safe comparison
-    const a = Buffer.from(val, 'base64');
+    const a = Buffer.from(val, 'base64url');
     const b = Buffer.from(computed, 'base64');
+    console.log('[webhook] a.length:', a.length, 'b.length:', b.length);
     return version === 'v1' && a.length === b.length && crypto.timingSafeEqual(a, b);
   });
 }
