@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/webhook/polar.js": {
-      "bodyParser": false
+      "memory": 128
     }
   }
 }
