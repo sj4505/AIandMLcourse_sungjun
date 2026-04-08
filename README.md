@@ -1,116 +1,213 @@
-# Sungjun An — Portfolio
+# 전산물리: AI와 물리학의 만남
+## Computational Physics: From Neural Networks to Physics-Informed AI
 
-개인 프로젝트 및 AI·ML 실습 결과물 모음입니다.
-
----
-
-## Projects
-
-### 1. Budget App — 스마트 가계부 웹앱
-**`budget-app/index.html`**
-
-SMS 문자를 붙여넣으면 OpenAI가 자동으로 지출을 분석해주는 가계부 앱입니다.
-
-**주요 기능:**
-- SMS 문자 파싱 + OpenAI 기반 지출 자동 분류
-- 더치페이 계산기
-- 할부 / 대출 관리 및 진행률 추적
-- 월별 예산 설정 및 일일 가용 금액 자동 계산
-- 브라우저 localStorage 기반 (서버 불필요, 바로 실행)
-
-**실행 방법:** `budget-app/index.html`을 브라우저에서 열기
+**부산대학교 물리학과**
+**학년**: 2학년
+**학기**: 2026년 1학기
+**강의시간**: 주 3시간 (강의 2시간 + 실습 1시간)
+**사용 도구**: Python, Claude AI / Cursor, uv
 
 ---
 
-### 2. Focus Flow — 뽀모도로 태스크 매니저
-**`focus-flow/index.html`**
+## 📚 강의 개요
 
-작업을 30분 단위로 쪼개고 우선순위를 정해준 뒤, 뽀모도로 타이머로 집중할 수 있는 웹앱입니다.
+본 강의는 현대 물리학 연구에서 필수적인 인공지능 기술을 학습하고, 이를 실제 물리 문제 해결에 적용하는 능력을 배양합니다. Neural Network의 기초부터 최신 Large Language Model(LLM), 그리고 물리학 특화 AI인 Physics-Informed Neural Networks(PINN)까지 다룹니다.
 
-**주요 기능:**
-- 태스크 자동 분할 (30분 단위 시간 블록)
-- 우선순위 자동 정렬
-- 뽀모도로 타이머 연동
-- 브라우저 localStorage 기반 (서버 불필요, 바로 실행)
-
-**실행 방법:** `focus-flow/index.html`을 브라우저에서 열기
+**핵심 특징**:
+- MIT 강의 자료 기반의 체계적인 이론 학습
+- Claude AI / Cursor를 활용한 "vibe coding" 실습
+- 역학, 전자기학, 양자역학, 통계물리 문제의 AI 기반 수치 해법
+- 물리 법칙을 학습에 직접 포함하는 PINN 기법
+- `uv` 패키지 매니저를 이용한 최신 Python 개발 환경
 
 ---
 
-### 3. Physics Web — 부산대 물리학과 웹사이트
-**`physics-web/`**
+## 🎯 학습 목표
 
-FastAPI 기반 물리학과 소개 웹사이트입니다.
+1. Neural Network의 기본 원리와 작동 방식 이해
+2. Deep Learning과 Transformer 아키텍처 학습
+3. LLM을 활용한 효율적인 코딩 능력 배양 (Vibe Coding)
+4. 물리 문제를 AI로 해결하는 실전 경험
+5. PINN을 이용한 미분방정식 해법 습득
 
-**기술 스택:** Python, FastAPI, Jinja2 Templates
+---
 
-**실행 방법:**
+## 📅 강의 일정 (16주)
+
+### 🔷 Part I: Neural Networks & Deep Learning (Weeks 1-7)
+
+#### **Week 1: 강의 소개 및 환경 설정** ✅
+- 개발 환경 설정: Git, Cursor (AI 기반 IDE), uv (Python 패키지 매니저)
+- Claude AI 계정 생성 및 기본 사용법
+- **실습**: "Hello, Neural Network!" - TensorFlow로 첫 번째 신경망 구현, 수치 해법 비교
+
+**Python 파일**: `00_hello_world.py`, `01_hello_nn.py`, `02_polynomial_fitting.py`
+
+---
+
+#### **Week 2: 머신러닝 기초** ✅
+- 지도/비지도/강화 학습, 데이터 전처리, 손실 함수와 최적화
+- **실습**: 훅의 법칙 선형 회귀, K-Means 군집화, Gradient Descent 시각화
+
+**Python 파일**: `01_linear_regression_spring.py`, `02_unsupervised_clustering.py`, `03_data_preprocessing.py`, `04_gradient_descent_vis.py`
+
+---
+
+#### **Week 3: Neural Network 기초 이론** ✅
+- Perceptron, MLP, Activation Functions, Forward/Backward Propagation
+- Universal Approximation Theorem
+- **실습**: Perceptron 논리 게이트, Numpy MLP로 XOR 해결
+
+**Python 파일**: `01_perceptron.py`, `02_activation_functions.py`, `03_forward_propagation.py`, `04_mlp_numpy.py`, `05_universal_approximation.py`
+
+---
+
+#### **Week 4: 물리 데이터로 학습하기** ✅
+- Neural Network로 물리 법칙 학습, 과적합/과소적합, RK4 수치 적분
+- **실습**: 1D 함수 근사, 포물선 운동 예측, 과적합 실험, 진자 주기 예측
+
+**Python 파일**: `01perfect1d.py`, `02projectile.py`, `03overfitting.py`, `04pendulum.py`
+
+---
+
+#### **Week 5: Deep Learning의 핵심 기법** ✅
+- Regularization (L1/L2, Dropout, Batch Normalization), Data Augmentation, Transfer Learning
+- **실습**: MNIST 손글씨 인식 (CNN)
+
+**Python 파일**: `01_regularization.py`, `02_overfitting_underfitting.py`, `03_data_augmentation.py`, `04_transfer_learning.py`, `05_mnist_cnn.py`
+
+---
+
+#### **Week 6: Transformer와 Attention Mechanism** ✅
+- Self-Attention, Multi-Head Attention, Positional Encoding
+- Residual Connection & Layer Normalization
+- **실습**: 시계열 예측 (Transformer vs RNN 비교)
+
+**Python 파일**: `01_attention_basics.py`, `02_self_attention.py`, `03_positional_encoding.py`, `04_transformer_block.py`, `05_sequence_modeling.py`
+
+---
+
+#### **Week 7: Large Language Models (LLM) 개론** ✅
+- GPT vs BERT 아키텍처 비교, Tokenization, RLHF
+- **실습**: Claude API 개념 이해, Prompt Engineering
+
+**Python 파일**: `01_tokens_and_embeddings.py`, `02_gpt_bert_architectures.py`, `03_pretraining_finetuning.py`, `04_claude_api_simple.py`
+
+---
+
+### 🔷 Part II: LLM Vibe Coding for Physics (Weeks 8-12)
+
+#### **Week 8: 중간고사 / LLM 기반 코딩 입문**
+- Vibe Coding, Prompt Engineering 심화, AI 디버깅
+
+#### **Week 9: 고전 역학 문제 해결**
+- Euler vs RK4, 행성 운동, 이중 진자 혼돈, 라그랑지안/해밀토니안 역학
+
+#### **Week 10: 전자기학 시뮬레이션**
+- Maxwell 방정식, FDTD, 전기장/자기장 시각화, 전자기파 전파
+
+#### **Week 11: 양자역학 시뮬레이션**
+- Schrödinger 방정식, 파동함수 시각화, 터널링 효과, 조화 진동자
+
+#### **Week 12: 통계물리 및 Monte Carlo 시뮬레이션**
+- Metropolis-Hastings, Ising 모델, 상전이, 임계 현상
+
+---
+
+### 🔷 Part III: Physics-Informed Neural Networks (Weeks 13-14)
+
+#### **Week 13: PINN 기초 이론 - ODE**
+- PINN 개념, 자동 미분, Physics Loss 설계, PINN vs RK4 비교
+
+#### **Week 14: PINN 응용 - PDE**
+- 1D/2D Heat Equation, Wave Equation, Burgers Equation, 복잡한 경계조건
+
+---
+
+### 🔷 Part IV: 최종 프로젝트 (Weeks 15-16)
+
+#### **Week 15: PINN 응용 II & 최종 프로젝트 시작**
+#### **Week 16: 최종 프로젝트 발표 및 기말고사**
+
+---
+
+## 📊 평가 방식
+
+| 항목 | 비율 | 세부 내용 |
+|------|------|----------|
+| **과제** | 30% | 주간 과제 6회 (각 5%) |
+| **중간 프로젝트** | 15% | Part I 요약 발표 |
+| **최종 프로젝트** | 25% | 팀 프로젝트 (코드 + 보고서 + 발표) |
+| **중간고사** | 10% | 이론 및 기본 실습 |
+| **기말고사** | 15% | 종합 평가 |
+| **출석 및 참여** | 5% | 수업 참여도 및 토론 |
+
+---
+
+## 💻 실습 환경
+
+### 환경 설정
+
 ```bash
-cd physics-web
-pip install -r requirements.txt
-python main.py
-# http://localhost:8000 에서 확인
+# 1. Git 설치 확인
+git --version
+
+# 2. Cursor 설치: https://cursor.sh/
+
+# 3. uv 설치 (Windows PowerShell)
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# 4. 프로젝트 환경 설정
+uv venv
+uv sync
+
+# 5. 코드 실행
+cd week1
+uv run python 01_hello_nn.py
 ```
 
----
-
-### 4. Week 3 — 신경망 실험 PySide6 GUI 앱
-**`week3/week3_app.py`**
-
-Perceptron, 활성화 함수, MLP, Universal Approximation 등 신경망 핵심 개념을 인터랙티브하게 실험할 수 있는 데스크탑 앱입니다.
-
-**주요 기능:**
-- Lab 1: Perceptron — AND/OR/XOR 게이트 학습
-- Lab 2: 활성화 함수 비교 (Sigmoid, Tanh, ReLU, Leaky ReLU)
-- Lab 3: 순전파(Forward Propagation) 시각화
-- Lab 4: MLP (numpy 직접 구현)
-- Lab 5: Universal Approximation Theorem 실험
-
-**기술 스택:** Python, PySide6, TensorFlow, matplotlib
-
-**실행 방법:**
-```bash
-pip install PySide6 tensorflow numpy matplotlib
-python week3/week3_app.py
-```
+### 필수 패키지
+- numpy, scipy, matplotlib
+- tensorflow, torch
+- anthropic (Claude API)
 
 ---
 
-### 5. Week 4 — 물리 ML 실험 PySide6 GUI 앱
-**`week4/week4_app.py`**
+## 📖 교재 및 참고자료
 
-물리 데이터를 Neural Network로 학습·예측하는 4가지 실험을 인터랙티브하게 실행할 수 있는 데스크탑 앱입니다. TDD로 개발되었습니다.
+### 주교재
+- **MIT 6.S191**: Introduction to Deep Learning
+- 강의자 제공 자료: Python 코드 예제, 주차별 가이드 (`week*.md`)
 
-**주요 기능:**
-- Lab 1: 1D 함수 근사 (Universal Approximation Theorem)
-- Lab 2: 포물선 운동 궤적 회귀
-- Lab 3: 과적합 vs 과소적합 시각화
-- Lab 4: 진자 주기 예측 (비선형 물리 법칙 학습)
+### 참고서적
+- *Deep Learning* by Goodfellow, Bengio, and Courville
+- *Computational Physics* by Mark Newman
+- *Physics-Informed Neural Networks* (관련 논문 모음)
 
-**기술 스택:** Python, PySide6, TensorFlow/Keras, matplotlib, pytest
-
-**실행 방법:**
-```bash
-pip install PySide6 tensorflow numpy matplotlib
-python week4/week4_app.py
-```
+### 온라인 자료
+- [MIT 6.S191](http://introtodeeplearning.com/)
+- [Cursor IDE](https://cursor.sh/)
+- [uv Package Manager](https://docs.astral.sh/uv/)
+- [DeepXDE Library](https://deepxde.readthedocs.io/)
 
 ---
 
-## Tech Stack
+## 🎓 선수 과목
 
-| 분야 | 기술 |
-|------|------|
-| Frontend | HTML, CSS, JavaScript |
-| Backend | Python, FastAPI |
-| Desktop GUI | Python, PySide6 |
-| ML / AI | TensorFlow/Keras, NumPy, OpenAI API |
-| Testing | pytest, pytest-qt |
-| Tools | uv, Git |
+- **필수**: 일반물리학 I/II, 역학, 전자기학 I, Python 기초
+- **권장**: 양자역학 I, 수리물리학, 통계물리
 
 ---
 
-## Contact
+## 📌 주의사항
 
-**Sungjun An**  
-ansungjun1610@gmail.com
+1. **학술 윤리**: AI 도구 사용 시 출처를 명확히 밝혀야 합니다
+2. **코드 공유**: 과제는 개인 작업이며, 코드 복사는 금지됩니다
+3. **출석**: 실습 중심 강의이므로 출석이 매우 중요합니다
+4. **준비물**: 노트북 필수 (실습용)
+5. **AI 검증**: AI가 생성한 코드와 결과는 반드시 물리적으로 검증할 것
+
+---
+
+**Last Updated**: 2026-03-04
+**Version**: 2.2
