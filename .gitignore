@@ -24,6 +24,8 @@ week13/
 week14/
 
 # Local env files
+.env
+*.env
 .env.local
 .env.*.local
 
