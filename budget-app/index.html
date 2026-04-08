@@ -166,6 +166,7 @@
     }
 
     async function initStorage() {
+      Object.keys(_memCache).forEach(k => delete _memCache[k]);
       const { data, error } = await _sbClient
         .from('user_data')
         .select('key, value')
@@ -1217,8 +1218,9 @@ feedback은 오늘 예산 상황을 포함한 1문장 한국어 코멘트. 절�
 
     function goToCheckout() {
       const email = _currentUser?.email ?? '';
+      const sep = POLAR_CHECKOUT_URL.includes('?') ? '&' : '?';
       const url = POLAR_CHECKOUT_URL +
-        (email ? '?customer_email=' + encodeURIComponent(email) : '');
+        (email ? sep + 'customer_email=' + encodeURIComponent(email) : '');
       window.location.href = url;
     }
 
