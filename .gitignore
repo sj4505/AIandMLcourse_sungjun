@@ -12,6 +12,9 @@ wheels/
 # Claude Code local config
 .claude/
 
+# Git worktrees
+.worktrees/
+
 # Weeks not yet published
 week9/
 week10/
