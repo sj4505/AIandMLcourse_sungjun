@@ -90,6 +90,7 @@
 
     const _sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let _currentUser = null;
+    let _initializing = false;
     const _memCache  = {};
 
     // ── STORAGE ─────────────────────────────────────────────────────────
@@ -1164,25 +1165,32 @@ feedback은 오늘 예산 상황을 포함한 1문장 한국어 코멘트. 절�
     }
 
     async function init() {
-      const { data: { session } } = await _sbClient.auth.getSession();
+      if (_initializing) return;
+      _initializing = true;
 
-      if (!session) {
-        showOverlay('auth-overlay');
-        return;
+      try {
+        const { data: { session } } = await _sbClient.auth.getSession();
+
+        if (!session) {
+          showOverlay('auth-overlay');
+          return;
+        }
+
+        _currentUser = session.user;
+        await ensureUserRecord(session.user);
+
+        const status = await getSubscriptionStatus(session.user.id);
+        if (status !== 'active') {
+          showOverlay('pay-overlay');
+          return;
+        }
+
+        await initStorage();
+        hideOverlays();
+        switchTab('home');
+      } finally {
+        _initializing = false;
       }
-
-      _currentUser = session.user;
-      await ensureUserRecord(session.user);
-
-      const status = await getSubscriptionStatus(session.user.id);
-      if (status !== 'active') {
-        showOverlay('pay-overlay');
-        return;
-      }
-
-      await initStorage();
-      hideOverlays();
-      switchTab('home');
     }
 
     // OAuth 리다이렉트 콜백 처리
