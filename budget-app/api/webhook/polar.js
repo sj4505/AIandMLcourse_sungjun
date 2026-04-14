@@ -51,18 +51,31 @@ function getRawBody(req) {
 }
 
 async function handler(req, res) {
+  console.log('[webhook] handler entered, method:', req.method);
   if (req.method !== 'POST') return res.status(405).end();
 
-  // Fix 3: wrap getRawBody in try/catch
   let rawBody;
   try {
     rawBody = await getRawBody(req);
   } catch (e) {
+    console.log('[webhook] getRawBody error:', e.message);
     return res.status(400).json({ error: 'Failed to read request body' });
   }
 
+  console.log('[webhook] rawBody length:', rawBody.length, 'first50:', rawBody.substring(0, 50));
+
   const isValid = verifySignature(rawBody, req.headers, process.env.POLAR_WEBHOOK_SECRET);
-  if (!isValid) return res.status(401).json({ error: 'Invalid signature' });
+  if (!isValid) return res.status(401).json({
+    error: 'Invalid signature',
+    debug: {
+      rawBodyLen: rawBody.length,
+      msgId: req.headers['webhook-id'],
+      msgTs: req.headers['webhook-timestamp'],
+      sigHeader: req.headers['webhook-signature'],
+      secretPresent: !!process.env.POLAR_WEBHOOK_SECRET,
+      secretLen: process.env.POLAR_WEBHOOK_SECRET?.length,
+    }
+  });
 
   // Fix 4: wrap JSON.parse in try/catch
   let event;
