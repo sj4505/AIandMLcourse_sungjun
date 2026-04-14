@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const { validateEvent } = require('@polar-sh/sdk/webhooks');
 const { createClient } = require('@supabase/supabase-js');
 
 const ACTIVE_EVENTS = new Set(['subscription.active', 'subscription.created']);
@@ -7,34 +7,6 @@ const sbAdmin = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-
-function verifySignature(rawBody, headers, secret) {
-  const msgId = headers['webhook-id'];
-  const msgTimestamp = headers['webhook-timestamp'];
-  const msgSignature = headers['webhook-signature'];
-  if (!msgId || !msgTimestamp || !msgSignature) return { ok: false, reason: 'missing_headers' };
-
-  const now = Math.floor(Date.now() / 1000);
-  const ts = parseInt(msgTimestamp, 10);
-  const diff = Math.abs(now - ts);
-  if (isNaN(ts) || diff > 300) return { ok: false, reason: 'timestamp', diff, now, ts };
-
-  const secretBytes = Buffer.from(secret.replace(/^(whsec_|polar_whs_)/, ''), 'base64');
-  const computed = crypto
-    .createHmac('sha256', secretBytes)
-    .update(`${msgId}.${msgTimestamp}.`)
-    .update(rawBody)
-    .digest('base64');
-
-  const matched = msgSignature.split(' ').some(sig => {
-    const [version, val] = sig.split(',');
-    if (version !== 'v1' || !val) return false;
-    const a = Buffer.from(val, 'base64');
-    const b = Buffer.from(computed, 'base64');
-    return a.length === b.length && crypto.timingSafeEqual(a, b);
-  });
-  return matched ? { ok: true } : { ok: false, reason: 'hmac_mismatch', computed, sig: msgSignature, bodyLen: rawBody.length, bodyStart: rawBody.slice(0, 30).toString('hex') };
-}
 
 function getRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -55,14 +27,11 @@ async function handler(req, res) {
     return res.status(400).json({ error: 'Failed to read request body' });
   }
 
-  const result = verifySignature(rawBody, req.headers, process.env.POLAR_WEBHOOK_SECRET);
-  if (!result.ok) return res.status(401).json({ error: 'Invalid signature', debug: result });
-
   let event;
   try {
-    event = JSON.parse(rawBody.toString('utf8'));
+    event = validateEvent(rawBody, req.headers, process.env.POLAR_WEBHOOK_SECRET);
   } catch (e) {
-    return res.status(400).json({ error: 'Invalid JSON' });
+    return res.status(401).json({ error: 'Invalid signature', detail: e.message });
   }
 
   const email = event.data?.customer?.email;
