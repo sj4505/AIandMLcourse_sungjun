@@ -12,11 +12,12 @@ function verifySignature(rawBody, headers, secret) {
   const msgId = headers['webhook-id'];
   const msgTimestamp = headers['webhook-timestamp'];
   const msgSignature = headers['webhook-signature'];
-  if (!msgId || !msgTimestamp || !msgSignature) return false;
+  if (!msgId || !msgTimestamp || !msgSignature) return { ok: false, reason: 'missing_headers' };
 
   const now = Math.floor(Date.now() / 1000);
   const ts = parseInt(msgTimestamp, 10);
-  if (isNaN(ts) || Math.abs(now - ts) > 300) return false;
+  const diff = Math.abs(now - ts);
+  if (isNaN(ts) || diff > 300) return { ok: false, reason: 'timestamp', diff, now, ts };
 
   const toSign = `${msgId}.${msgTimestamp}.${rawBody}`;
   const secretBytes = Buffer.from(secret.replace(/^(whsec_|polar_whs_)/, ''), 'base64');
@@ -25,13 +26,14 @@ function verifySignature(rawBody, headers, secret) {
     .update(toSign)
     .digest('base64');
 
-  return msgSignature.split(' ').some(sig => {
+  const matched = msgSignature.split(' ').some(sig => {
     const [version, val] = sig.split(',');
     if (version !== 'v1' || !val) return false;
     const a = Buffer.from(val, 'base64');
     const b = Buffer.from(computed, 'base64');
     return a.length === b.length && crypto.timingSafeEqual(a, b);
   });
+  return matched ? { ok: true } : { ok: false, reason: 'hmac_mismatch', computed, sig: msgSignature, bodyLen: rawBody.length };
 }
 
 function getRawBody(req) {
@@ -53,8 +55,8 @@ async function handler(req, res) {
     return res.status(400).json({ error: 'Failed to read request body' });
   }
 
-  const isValid = verifySignature(rawBody, req.headers, process.env.POLAR_WEBHOOK_SECRET);
-  if (!isValid) return res.status(401).json({ error: 'Invalid signature' });
+  const result = verifySignature(rawBody, req.headers, process.env.POLAR_WEBHOOK_SECRET);
+  if (!result.ok) return res.status(401).json({ error: 'Invalid signature', debug: result });
 
   let event;
   try {
