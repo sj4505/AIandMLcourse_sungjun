@@ -19,11 +19,11 @@ function verifySignature(rawBody, headers, secret) {
   const diff = Math.abs(now - ts);
   if (isNaN(ts) || diff > 300) return { ok: false, reason: 'timestamp', diff, now, ts };
 
-  const toSign = `${msgId}.${msgTimestamp}.${rawBody}`;
   const secretBytes = Buffer.from(secret.replace(/^(whsec_|polar_whs_)/, ''), 'base64');
   const computed = crypto
     .createHmac('sha256', secretBytes)
-    .update(toSign)
+    .update(`${msgId}.${msgTimestamp}.`)
+    .update(rawBody)
     .digest('base64');
 
   const matched = msgSignature.split(' ').some(sig => {
@@ -33,14 +33,14 @@ function verifySignature(rawBody, headers, secret) {
     const b = Buffer.from(computed, 'base64');
     return a.length === b.length && crypto.timingSafeEqual(a, b);
   });
-  return matched ? { ok: true } : { ok: false, reason: 'hmac_mismatch', computed, sig: msgSignature, bodyLen: rawBody.length };
+  return matched ? { ok: true } : { ok: false, reason: 'hmac_mismatch', computed, sig: msgSignature, bodyLen: rawBody.length, bodyStart: rawBody.slice(0, 30).toString('hex') };
 }
 
 function getRawBody(req) {
   return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', chunk => { data += chunk; });
-    req.on('end', () => resolve(data));
+    const chunks = [];
+    req.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
 }
@@ -60,7 +60,7 @@ async function handler(req, res) {
 
   let event;
   try {
-    event = JSON.parse(rawBody);
+    event = JSON.parse(rawBody.toString('utf8'));
   } catch (e) {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
