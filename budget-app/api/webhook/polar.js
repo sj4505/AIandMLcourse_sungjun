@@ -50,11 +50,7 @@ function getRawBody(req) {
   });
 }
 
-module.exports.config = {
-  api: { bodyParser: false },
-};
-
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   // Fix 3: wrap getRawBody in try/catch
@@ -89,4 +85,7 @@ module.exports = async function handler(req, res) {
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ ok: true });
-};
+}
+
+handler.config = { api: { bodyParser: false } };
+module.exports = handler;
