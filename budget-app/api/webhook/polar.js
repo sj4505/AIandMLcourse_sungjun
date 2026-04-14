@@ -52,6 +52,7 @@ function getRawBody(req) {
 
 async function handler(req, res) {
   console.log('[webhook] handler entered, method:', req.method);
+  return res.status(200).json({ version: 'TEST_V5', method: req.method });
   if (req.method !== 'POST') return res.status(405).end();
 
   let rawBody;
