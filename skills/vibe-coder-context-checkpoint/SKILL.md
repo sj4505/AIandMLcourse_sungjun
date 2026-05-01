@@ -1,8 +1,3 @@
----
-name: vibe-coder-context-checkpoint
-description: Use when integration-related errors appear (401, 403, 404, 500), deployment changes aren't reflecting, same error repeats twice, or before/after Vercel CLI commands — verifies environment layer before allowing code changes involving Vercel, Google OAuth, Polar, Supabase, or GitHub
----
-
 # SKILL: Vibe Coder External Service Checkpoint
 version: 1.3
 target: Claude Code
@@ -47,8 +42,10 @@ When using Mode A:
 - State the comparison result explicitly.
 - Do not ask the user to run commands that Claude can run directly.
 
-### Mode B — User Confirms from Dashboard
-Claude cannot access external dashboards. The user must open the URL and provide the exact value.
+### Mode B — Screenshot via VS Code Claude Code
+Claude cannot access external dashboards directly via terminal.
+For Mode B checks, instruct the user to switch to VS Code Claude Code and attach a screenshot.
+VS Code Claude Code reads the screenshot, extracts values, and writes results to VERIFY.md directly.
 Apply Mode B only when the required information is unavailable via terminal.
 
 ```
@@ -56,15 +53,17 @@ Applicable checks:
   Vercel Production Branch setting
   Google OAuth authorized redirect URIs
   Polar registered webhook URL
-  Environment variable actual values (secret content)
+  Environment variable presence (masked values visible in dashboard)
   GitHub OAuth app settings
 ```
 
 When using Mode B:
-- Provide the exact URL path to the correct setting.
-- Specify exactly which field value to copy.
-- Never ask "is it X?" — always ask "what is the current value of X?"
-- After user provides value, show comparison and state result explicitly.
+- Instruct the user to switch to VS Code Claude Code window.
+- Provide the exact URL path to the correct dashboard setting.
+- Ask the user to take a screenshot (Windows: Win + Shift + S) and attach it in VS Code Claude Code.
+- VS Code Claude Code reads the screenshot directly and writes verified values to VERIFY.md.
+- Never ask the user to manually type or copy-paste dashboard values — screenshot is more reliable.
+- After screenshot is analyzed, VERIFY.md is updated and result is stated explicitly.
 
 ---
 
@@ -189,28 +188,34 @@ Result: match / mismatch
 If this had been wrong: [specific consequence in one line]
 ```
 
-### Format for Mode B (user confirms from dashboard)
+### Format for Mode B (VS Code Claude Code screenshot)
 
+Terminal Claude Code instructs:
 ```
 WHY: [one line — what breaks if this is wrong]
-ACTION: Open [exact URL path]
-PROVIDE: Current value of "[exact field name]"
+ACTION: Switch to VS Code Claude Code →
+        Open [exact URL path] →
+        Screenshot (Win + Shift + S) → attach in VS Code Claude Code
 ```
 
-After user provides value:
+VS Code Claude Code receives screenshot, then:
 ```
+[Reads screenshot directly]
+Extracted value: [value read from screenshot]
+WHY this matters: [one line explanation]
 Compared:
 - Expected: [value]
-- Actual: [value]
+- Actual: [value read from image]
 Result: match / mismatch
 If this had been wrong: [specific consequence in one line]
+[Writes result to VERIFY.md immediately]
 ```
 
 ### General Communication Rules
 
 ```
 - For Mode A: run first, then explain. Never ask the user to do what Claude can do.
-- For Mode B: explain WHY before asking. One line. Make it specific.
+- For Mode B: always use VS Code Claude Code screenshot method. Never ask user to type dashboard values manually.
 - Never ask "is it X?" or "did you check?"
 - State all results explicitly: match / mismatch / present / missing / correct / incorrect.
 - Announce completion: "✅ [item] confirmed. Moving on."
@@ -473,10 +478,15 @@ Mode A = Claude executes directly. Mode B = user confirms from dashboard.
 - **If missing:** install SDK before any code review
 
 #### Check 2 — REQUIRED — Mode A
-- **Check:** SDK used in webhook handler
-- **Why:** Package presence alone doesn't guarantee correct runtime verification.
-- **Execute:** search webhook handler files for SDK import and usage
-- **Pass:** handler uses official SDK-based verification path
+- **Check:** SDK actually used in webhook handler + no manual HMAC implementation
+- **Why:** Package installed does not mean it is being used. Manual HMAC implementation diverges from Polar internal logic even when SDK is installed. (confirmed: 7 failed attempts in real case before switching to SDK)
+- **Execute:**
+  - grep -r validateEvent . → confirm SDK usage
+  - grep -r createHmac . → detect manual implementation
+- **Pass:** validateEvent found AND createHmac NOT found in webhook handler
+- **If createHmac detected:** Declare: Manual HMAC implementation detected. This is the most common cause of Polar webhook 401 errors. Replace with official SDK before any other fix.
+  Remove: crypto.createHmac
+  Replace with: const { validateEvent } = require(@polar-sh/sdk/webhooks) then event = validateEvent(rawBody, req.headers, process.env.POLAR_WEBHOOK_SECRET)
 
 #### Check 3 — CRITICAL — Mode B
 - **Check:** Registered webhook URL
