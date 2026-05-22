@@ -1,101 +1,74 @@
-import Image from "next/image";
+import Link from "next/link";
+import { AppHeader } from "@/components/AppHeader";
+import { Button } from "@/components/Button";
+import { MoodChip } from "@/components/MoodChip";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <>
+      <AppHeader />
+      <main>
+        {/* Hero */}
+        <section className="bg-canvas-warm py-16 px-4">
+          <div className="max-w-[560px] mx-auto text-center">
+            <p className="text-xs font-semibold text-primary mb-3 tracking-wide uppercase">
+              부산대생 전용 베타
+            </p>
+            <h1 className="text-[32px] font-bold text-ink leading-tight mb-4">
+              우리 팀 분위기에 딱 맞는<br />과팅 상대를 찾아보세요
+            </h1>
+            <p className="text-base text-body mb-8">
+              성향 테스트로 역할을 파악하고, 팀을 만들어 궁합 점수를 확인하세요.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link href="/test">
+                <Button variant="primary" className="rounded-full">
+                  성향 테스트 시작
+                </Button>
+              </Link>
+              <Link href="/team/create">
+                <Button variant="secondary" className="rounded-full">
+                  팀 바로 만들기
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </section>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+        {/* How it works */}
+        <section className="py-14 px-4">
+          <div className="max-w-[700px] mx-auto">
+            <h2 className="text-2xl font-bold text-ink mb-10 text-center">어떻게 진행되나요?</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {[
+                { step: "01", title: "성향 테스트", desc: "10개 상황 문항으로 나의 과팅 스타일을 파악해요." },
+                { step: "02", title: "팀 생성",     desc: "팀명과 분위기를 선택하고 팀원의 역할을 입력해요." },
+                { step: "03", title: "매칭 추천",   desc: "궁합 점수와 이유를 바탕으로 상대팀을 추천해드려요." },
+              ].map(({ step, title, desc }) => (
+                <div key={step} className="bg-surface-soft rounded-lg p-6">
+                  <p className="text-xs font-semibold text-primary mb-2">{step}</p>
+                  <h3 className="text-base font-semibold text-ink mb-2">{title}</h3>
+                  <p className="text-sm text-body">{desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Mood examples */}
+        <section className="py-10 px-4 border-t border-hairline-soft">
+          <div className="max-w-[560px] mx-auto">
+            <p className="text-sm font-semibold text-muted text-center mb-4">어떤 분위기를 원하세요?</p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <MoodChip mood="comfortableTalk" />
+              <MoodChip mood="activeSocial" />
+              <MoodChip mood="gamesAndDrinks" />
+              <MoodChip mood="respectfulSafe" />
+              <MoodChip mood="naturalIntro" />
+            </div>
+          </div>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+    </>
   );
 }
