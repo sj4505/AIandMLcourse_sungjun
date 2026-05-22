@@ -125,9 +125,22 @@ type MoodKey =
   | "respectfulSafe"    // 예의/안전 중시형 → lavender
   | "naturalIntro";     // 자연스러운 소개팅형 → sky
 
+type MemberRole =
+  | "moodMaker"     // 분위기 메이커형
+  | "coordinator"   // 조율자형
+  | "considerate"   // 배려형
+  | "reactor";      // 리액션형
+
+type TeamMember = {
+  nickname: string;
+  role: MemberRole;
+  traits?: Record<TraitKey, number>;  // 팀장만 보유 (테스트 결과)
+  isLeader?: boolean;
+};
+
 type UserProfile = {
   nickname: string;
-  traits: Record<TraitKey, number>;  // 1~5
+  traits: Record<TraitKey, number>;  // 1~5, /test 결과
 };
 
 type TeamProfile = {
@@ -137,7 +150,7 @@ type TeamProfile = {
   size: number;
   ageRange: string;
   mood: MoodKey;
-  members: UserProfile[];
+  members: TeamMember[];            // 팀장 포함 2~5명
 };
 ```
 
@@ -148,7 +161,22 @@ type TeamProfile = {
 ## 5. Personality Test (성향 테스트)
 
 **형식:** 상황형 객관식 (4지선다), 10문항 (trait당 2문항)  
-**저장:** `/test` 완료 시 `gwating_user.traits` → localStorage
+**저장:** `/test` 완료 시 `gwating_user.traits` → localStorage  
+**자동 역할 분류:** 테스트 완료 직후 traits 점수를 기반으로 팀장의 `MemberRole`을 자동 결정
+
+### Trait → MemberRole 자동 분류
+
+각 역할의 복합 점수를 계산해 가장 높은 역할을 배정:
+
+| Role | 기준 trait (가중합) |
+|------|---------------------|
+| `moodMaker` | atmosphereCoordination × 0.6 + participation × 0.4 |
+| `coordinator` | communicationBalance × 0.6 + atmosphereCoordination × 0.4 |
+| `considerate` | consideration × 0.6 + respectfulness × 0.4 |
+| `reactor` | participation × 0.5 + communicationBalance × 0.5 |
+
+결과는 `/test` 완료 화면에서 역할 이름과 한 줄 설명으로 표시.  
+팀장 `TeamMember` 객체에 `isLeader: true`, `traits: {...}`, 계산된 `role` 포함.
 
 ### Trait → 문항 매핑 예시
 
@@ -172,12 +200,42 @@ type TeamProfile = {
 ## 6. Matching Score
 
 ```
-Final Score = 40% × vibeScore + 35% × traitScore + 25% × conditionScore
+Final Score = 40% × vibeScore + 35% × roleBalanceScore + 25% × conditionScore
 ```
 
 - **vibeScore (40%):** 5×5 가중치 행렬. 같은 mood면 1.0, 인접하면 0.6~0.8, 반대면 0.2. (`data/moodWeights.ts`)
-- **traitScore (35%):** 두 팀의 trait 평균 벡터 간 코사인 유사도 근사 (정규화 후 dot product)
+- **roleBalanceScore (35%):** 두 팀의 role 분포 보완성 점수 (아래 참조)
 - **conditionScore (25%):** 인원 수 일치 (50%) + 나이대 겹침 (50%)
+
+### Role Balance Score 계산
+
+각 팀의 `members` role 분포를 4차원 벡터로 변환 후 보완성 측정:
+
+```ts
+// 예: 내 팀 [moodMaker×2, coordinator×1]
+// 상대팀 [considerate×2, reactor×1]
+// → 서로 부족한 역할을 채워주므로 고점
+
+roleVector = {
+  moodMaker:   count / total,
+  coordinator: count / total,
+  considerate: count / total,
+  reactor:     count / total,
+}
+
+// 보완성 = 1 - dot(myVector, theirVector)
+// (벡터가 다를수록 서로를 잘 보완)
+// 단, 최소 1개의 공통 역할이 있으면 +0.1 보너스
+```
+
+역할별 UI 표시:
+
+| Role | 한국어 | 설명 |
+|------|--------|------|
+| `moodMaker` | 분위기 메이커형 | 에너지를 끌어올리는 사람 |
+| `coordinator` | 조율자형 | 흐름을 이어주는 사람 |
+| `considerate` | 배려형 | 모두를 챙기는 사람 |
+| `reactor` | 리액션형 | 분위기를 살려주는 사람 |
 
 점수 표현:
 - 80%↑ → "Strong vibe fit"
@@ -197,7 +255,8 @@ Final Score = 40% × vibeScore + 35% × traitScore + 25% × conditionScore
 | `MoodChip` | 분위기 칩, 5가지 파스텔 색상 |
 | `MoodSelector` | 5개 MoodChip 선택 UI |
 | `QuizCard` | 상황 문항 + 4지선다 + 진행 바 |
-| `TeamCreateForm` | 팀명/인원/나이대 입력 + MoodSelector |
+| `TeamCreateForm` | 팀명/나이대 입력 + 팀원 추가 (닉네임+역할) + MoodSelector |
+| `MemberRoleCard` | 팀원 한 명의 닉네임 + 역할 선택 UI (4개 역할 칩) |
 | `TeamProfileCard` | 팀 요약 카드 (trait 강점 문장 포함) |
 | `RecommendationTeamCard` | 상대팀 카드 (점수 + 이유 2~3개) |
 | `MatchScoreCard` | 대형 점수 숫자 + 헤드라인 |
@@ -249,25 +308,28 @@ gwating-app/                 ← 현재 레포 루트에 새 폴더
 
 `data/mockTeams.ts`에 정의할 상대팀 5개:
 
-| 팀명 | 인원 | 나이대 | 분위기 |
-|------|---:|--------|--------|
-| 용두산 삼총사 | 3 | 22~23 | comfortableTalk |
-| 남포동 클럽 | 4 | 21~24 | activeSocial |
-| 해운대 게임단 | 3 | 22~24 | gamesAndDrinks |
-| 온천장 신사단 | 3 | 21~22 | respectfulSafe |
-| 서면 인트로 | 4 | 20~23 | naturalIntro |
+| 팀명 | 인원 | 나이대 | 분위기 | 역할 구성 |
+|------|---:|--------|--------|-----------|
+| 용두산 삼총사 | 3 | 22~23 | comfortableTalk | coordinator×2, considerate×1 |
+| 남포동 클럽 | 4 | 21~24 | activeSocial | moodMaker×2, reactor×2 |
+| 해운대 게임단 | 3 | 22~24 | gamesAndDrinks | moodMaker×1, reactor×2 |
+| 온천장 신사단 | 3 | 21~22 | respectfulSafe | considerate×2, coordinator×1 |
+| 서면 인트로 | 4 | 20~23 | naturalIntro | coordinator×1, considerate×1, moodMaker×1, reactor×1 |
 
 모두 학교: 부산대학교, 지역: 부산.
+
+각 팀의 `members` 배열에 `isLeader: true` 멤버 1명(traits 포함) + 나머지(role만) 구성.
 
 ---
 
 ## 10. Known MVP Tradeoffs
 
 - 실제 인증/로그인 없음 (단일 사용자 데모)
-- 팀원 여러 명 입력 UI 없음 (팀장 1명 trait만 사용해 팀 대표값으로 활용)
-- 사진 없음 (팀 이니셜 아바타로 대체)
+- 팀장만 traits 보유 (테스트 기반 자동 역할 분류), 나머지 팀원은 닉네임+역할만 수동 입력
+- 팀원 수: 팀장 포함 2~5명 (MVP에서 강제 검증)
+- 사진 없음 (역할별 이모지 아이콘으로 대체)
 - 실제 초대/수락 플로우 없음
-- 매칭 점수는 데모용 근사값
+- 매칭 점수는 데모용 근사값 (roleBalanceScore는 보완성 기반 단순 계산)
 
 ---
 
