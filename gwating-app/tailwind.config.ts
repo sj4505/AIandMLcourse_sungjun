@@ -44,7 +44,7 @@ const config: Config = {
       },
       fontSize: {
         hero:    ["32px", { lineHeight: "1.18", fontWeight: "700" }],
-        score:   ["48px", { lineHeight: "1.0",  fontWeight: "750" }],
+        score:   ["48px", { lineHeight: "1.0",  fontWeight: "800" }],
       },
     },
   },
