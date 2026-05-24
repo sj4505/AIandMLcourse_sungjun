@@ -148,8 +148,10 @@ CREATE POLICY "staff_select" ON public.staff
 CREATE POLICY "staff_insert" ON public.staff
   FOR INSERT TO authenticated WITH CHECK (true);
 
--- students: 인증된 교직원만 전체 권한
-CREATE POLICY "students_all_auth" ON public.students
+-- students: 읽기는 anon 허용 (키오스크 전화번호 조회), 쓰기는 인증만
+CREATE POLICY "students_select_anon" ON public.students
+  FOR SELECT USING (true);
+CREATE POLICY "students_write_auth" ON public.students
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- periods: 누구나 읽기 (키오스크 anon 필요)
