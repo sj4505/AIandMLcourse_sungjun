@@ -27,12 +27,18 @@ CREATE TABLE IF NOT EXISTS public.students (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 교시 (1교시~4교시, 시드 데이터로 채움)
+-- 교시
 CREATE TABLE IF NOT EXISTS public.periods (
-  id         SERIAL      PRIMARY KEY,
-  name       TEXT        NOT NULL,
-  start_time TIME        NOT NULL,
-  end_time   TIME        NOT NULL
+  id                    SERIAL   PRIMARY KEY,
+  name                  TEXT     NOT NULL,
+  type                  TEXT     NOT NULL CHECK (type IN ('class', 'break', 'meal')),
+  weekday_start         TIME     NOT NULL,
+  weekday_end           TIME     NOT NULL,
+  weekend_start         TIME     NOT NULL,
+  weekend_end           TIME     NOT NULL,
+  weekday_is_autonomous BOOLEAN  NOT NULL DEFAULT FALSE,
+  weekend_is_autonomous BOOLEAN  NOT NULL DEFAULT FALSE,
+  order_index           INT      NOT NULL
 );
 
 -- 정기 일정 (학생이 요청 → 선생님 승인)
@@ -187,9 +193,23 @@ CREATE POLICY "announcements_delete_auth" ON public.announcements FOR DELETE TO 
 -- 교시 시드 데이터
 -- ========================
 
-INSERT INTO public.periods (name, start_time, end_time) VALUES
-  ('1교시', '15:00', '16:30'),
-  ('2교시', '16:30', '18:00'),
-  ('3교시', '18:00', '19:30'),
-  ('4교시', '19:30', '21:00')
+INSERT INTO public.periods (name, type, weekday_start, weekday_end, weekend_start, weekend_end, weekday_is_autonomous, weekend_is_autonomous, order_index) VALUES
+  ('등원',    'break', '07:50', '08:00', '07:50', '08:00', false, false,  0),
+  ('1교시',   'class', '08:00', '08:50', '08:00', '08:50', false, false,  1),
+  ('쉬는시간', 'break', '08:50', '09:00', '08:50', '09:00', false, false,  2),
+  ('2교시',   'class', '09:00', '10:30', '09:00', '10:30', false, false,  3),
+  ('쉬는시간', 'break', '10:30', '10:40', '10:30', '10:40', false, false,  4),
+  ('3교시',   'class', '10:40', '12:10', '10:40', '12:10', false, false,  5),
+  ('점심시간', 'meal',  '12:10', '13:10', '12:10', '13:10', false, false,  6),
+  ('4교시',   'class', '13:10', '14:40', '13:10', '14:40', false, false,  7),
+  ('쉬는시간', 'break', '14:40', '14:50', '14:40', '14:50', false, false,  8),
+  ('5교시',   'class', '14:50', '16:20', '14:50', '16:20', false, false,  9),
+  ('쉬는시간', 'break', '16:20', '16:30', '16:20', '16:30', false, false, 10),
+  ('6교시',   'class', '16:30', '18:00', '16:30', '18:00', false, false, 11),
+  ('저녁시간', 'meal',  '18:00', '19:00', '18:00', '19:00', false, false, 12),
+  ('7교시',   'class', '19:00', '20:30', '19:00', '20:30', false, true,  13),
+  ('쉬는시간', 'break', '20:30', '20:40', '20:30', '20:40', false, false, 14),
+  ('8교시',   'class', '20:40', '22:00', '20:40', '22:00', false, true,  15),
+  ('쉬는시간', 'break', '22:00', '22:10', '22:00', '22:10', false, false, 16),
+  ('9교시',   'class', '22:10', '23:40', '22:10', '23:40', true,  true,  17)
 ON CONFLICT DO NOTHING;

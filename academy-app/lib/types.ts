@@ -20,11 +20,19 @@ export interface Student {
   created_at: string
 }
 
+export type PeriodType = 'class' | 'break' | 'meal'
+
 export interface Period {
   id: number
   name: string
-  start_time: string
-  end_time: string
+  type: PeriodType
+  weekday_start: string
+  weekday_end: string
+  weekend_start: string
+  weekend_end: string
+  weekday_is_autonomous: boolean
+  weekend_is_autonomous: boolean
+  order_index: number
 }
 
 export interface Schedule {
