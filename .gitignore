@@ -23,3 +23,7 @@ wheels/
 
 # Node
 node_modules/
+
+# Tool runtime / temp files
+.bkit/
+.superpowers/

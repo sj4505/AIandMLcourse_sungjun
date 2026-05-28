@@ -7,14 +7,14 @@ import { QuizCard } from "@/components/QuizCard";
 import { Button } from "@/components/Button";
 import { questions } from "@/data/questions";
 import { saveUser } from "@/lib/storage";
-import { classifyRole } from "@/lib/scoring";
+import { classifyRole, TRAIT_KEYS } from "@/lib/scoring";
 import { TraitKey, MemberRole, UserProfile } from "@/types/matching";
 
 const ROLE_LABELS: Record<MemberRole, { name: string; desc: string; emoji: string }> = {
-  moodMaker:   { name: "분위기 메이커형", desc: "에너지를 끌어올리고 자리를 살려주는 역할이에요.",  emoji: "🔥" },
-  coordinator: { name: "조율자형",        desc: "대화 흐름을 이어주고 균형을 맞추는 역할이에요.",    emoji: "🎯" },
-  considerate: { name: "배려형",          desc: "모두를 세심하게 챙기는 역할이에요.",               emoji: "🤍" },
-  reactor:     { name: "리액션형",        desc: "분위기를 살려주는 반응으로 자리를 따뜻하게 해요.", emoji: "✨" },
+  moodMaker: { name: "분위기 메이커형", desc: "에너지를 띄우고 자리를 열어주는 역할에 가까워요.", emoji: "🎉" },
+  coordinator: { name: "조율자형", desc: "대화 흐름을 이어주고 균형을 맞추는 역할에 가까워요.", emoji: "🧭" },
+  considerate: { name: "배려형", desc: "모두를 편안하게 챙기는 역할에 가까워요.", emoji: "🤝" },
+  reactor: { name: "리액션형", desc: "분위기를 살리는 반응으로 자리를 부드럽게 만들어요.", emoji: "👏" },
 };
 
 type TraitScores = Partial<Record<TraitKey, number[]>>;
@@ -39,13 +39,9 @@ export default function TestPage() {
     setTraitScores(updated);
 
     if (currentIdx + 1 >= questions.length) {
-      const allTraits: TraitKey[] = [
-        "atmosphereCoordination", "consideration", "participation",
-        "respectfulness", "communicationBalance",
-      ];
-      const traits = allTraits.reduce((acc, key) => {
+      const traits = TRAIT_KEYS.reduce((acc, key) => {
         const scores = updated[key] ?? [3];
-        acc[key] = Math.round(scores.reduce((s, v) => s + v, 0) / scores.length);
+        acc[key] = Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length);
         return acc;
       }, {} as Record<TraitKey, number>);
 
@@ -82,7 +78,7 @@ export default function TestPage() {
                 type="text"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                placeholder="예: 민준"
+                placeholder="예: 민지"
                 maxLength={10}
                 className="w-full border border-hairline rounded-sm px-4 h-12 text-base text-ink focus:outline-none focus:border-primary"
               />
@@ -101,8 +97,8 @@ export default function TestPage() {
       <AppHeader step={1} totalSteps={3} />
       <main className="py-10 px-4 bg-canvas-warm min-h-screen">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-ink">나의 과팅 스타일은?</h1>
-          <p className="text-sm text-muted mt-1">상황을 읽고 솔직하게 골라주세요</p>
+          <h1 className="text-2xl font-bold text-ink">나의 과팅 스타일</h1>
+          <p className="text-sm text-muted mt-1">상황을 읽고 솔직하게 골라주세요.</p>
         </div>
         <QuizCard
           question={current}

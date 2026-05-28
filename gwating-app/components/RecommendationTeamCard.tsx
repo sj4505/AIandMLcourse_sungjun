@@ -4,7 +4,10 @@ import { MatchScoreCard } from "./MatchScoreCard";
 import { MatchReasonList } from "./MatchReasonList";
 
 const ROLE_EMOJI: Record<MemberRole, string> = {
-  moodMaker: "🔥", coordinator: "🎯", considerate: "🤍", reactor: "✨",
+  moodMaker: "🎉",
+  coordinator: "🧭",
+  considerate: "🤝",
+  reactor: "👏",
 };
 
 type Props = { result: MatchResult; rank: number };
@@ -39,9 +42,9 @@ export function RecommendationTeamCard({ result, rank }: Props) {
 
       <div className="flex flex-wrap items-center gap-2">
         <MoodChip mood={team.mood} selected />
-        {team.members.slice(0, 4).map((m, i) => (
-          <span key={i} className="text-base" title={m.role}>
-            {ROLE_EMOJI[m.role]}
+        {team.members.slice(0, 4).map((member, i) => (
+          <span key={`${member.nickname}-${i}`} className="text-base" title={member.role}>
+            {ROLE_EMOJI[member.role]}
           </span>
         ))}
       </div>

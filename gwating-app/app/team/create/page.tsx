@@ -12,6 +12,13 @@ import { MoodKey, MemberRole, TeamProfile, TeamMember } from "@/types/matching";
 
 type MemberDraft = { nickname: string; role: MemberRole | "" };
 
+const ROLE_LABELS: Record<MemberRole, string> = {
+  moodMaker: "🎉 분위기 메이커형",
+  coordinator: "🧭 조율자형",
+  considerate: "🤝 배려형",
+  reactor: "👏 리액션형",
+};
+
 export default function TeamCreatePage() {
   const router = useRouter();
   const [teamName, setTeamName] = useState("");
@@ -27,10 +34,10 @@ export default function TeamCreatePage() {
     if (!user) return;
     const role = classifyRole(user.traits);
     setLeader({
-      nickname:  user.nickname,
+      nickname: user.nickname,
       role,
-      traits:    user.traits,
-      isLeader:  true,
+      traits: user.traits,
+      isLeader: true,
     });
   }, []);
 
@@ -45,7 +52,7 @@ export default function TeamCreatePage() {
 
   function updateMember(i: number, patch: Partial<MemberDraft>) {
     setExtraMembers((prev) =>
-      prev.map((m, idx) => (idx === i ? { ...m, ...patch } : m))
+      prev.map((member, idx) => (idx === i ? { ...member, ...patch } : member))
     );
   }
 
@@ -55,7 +62,7 @@ export default function TeamCreatePage() {
     mood !== null &&
     leader !== null &&
     extraMembers.length > 0 &&
-    extraMembers.every((m) => m.nickname.trim() !== "" && m.role !== "");
+    extraMembers.every((member) => member.nickname.trim() !== "" && member.role !== "");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,18 +70,18 @@ export default function TeamCreatePage() {
 
     const members: TeamMember[] = [
       leader,
-      ...extraMembers.map((m) => ({
-        nickname: m.nickname.trim(),
-        role:     m.role as MemberRole,
+      ...extraMembers.map((member) => ({
+        nickname: member.nickname.trim(),
+        role: member.role as MemberRole,
       })),
     ];
 
     const team: TeamProfile = {
-      teamName:  teamName.trim(),
-      school:    "부산대학교",
-      region:    "부산",
-      size:      members.length,
-      ageRange:  ageRange.trim(),
+      teamName: teamName.trim(),
+      school: "부산대학교",
+      region: "부산",
+      size: members.length,
+      ageRange: ageRange.trim(),
       mood,
       members,
     };
@@ -100,7 +107,7 @@ export default function TeamCreatePage() {
       <main className="py-10 px-4">
         <div className="max-w-[560px] mx-auto">
           <h1 className="text-2xl font-bold text-ink mb-1">팀 만들기</h1>
-          <p className="text-sm text-muted mb-8">팀 정보를 입력하고 팀원 역할을 골라주세요</p>
+          <p className="text-sm text-muted mb-8">팀 정보를 입력하고 팀원의 역할을 골라주세요.</p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <div>
@@ -109,7 +116,7 @@ export default function TeamCreatePage() {
                 type="text"
                 value={teamName}
                 onChange={(e) => setTeamName(e.target.value)}
-                placeholder="예: 서면 드리머즈"
+                placeholder="예: 물리과 F3"
                 maxLength={20}
                 className="w-full border border-hairline rounded-sm px-4 h-12 text-base text-ink focus:outline-none focus:border-primary"
               />
@@ -133,15 +140,10 @@ export default function TeamCreatePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ink mb-2">팀장 (나)</label>
+              <label className="block text-sm font-semibold text-ink mb-2">팀장</label>
               <div className="border border-primary bg-primary-soft rounded-md p-4 text-sm">
                 <span className="font-semibold text-ink">{leader.nickname}</span>
-                <span className="ml-2 text-primary font-semibold">
-                  {leader.role === "moodMaker"   && "🔥 분위기 메이커형"}
-                  {leader.role === "coordinator" && "🎯 조율자형"}
-                  {leader.role === "considerate" && "🤍 배려형"}
-                  {leader.role === "reactor"     && "✨ 리액션형"}
-                </span>
+                <span className="ml-2 text-primary font-semibold">{ROLE_LABELS[leader.role]}</span>
                 <span className="ml-2 text-xs text-muted">(성향 테스트 결과)</span>
               </div>
             </div>
@@ -151,12 +153,12 @@ export default function TeamCreatePage() {
                 팀원 ({extraMembers.length}/4)
               </label>
               <div className="flex flex-col gap-3">
-                {extraMembers.map((m, i) => (
+                {extraMembers.map((member, i) => (
                   <MemberRoleCard
                     key={i}
                     index={i}
-                    nickname={m.nickname}
-                    role={m.role}
+                    nickname={member.nickname}
+                    role={member.role}
                     onNicknameChange={(val) => updateMember(i, { nickname: val })}
                     onRoleChange={(val) => updateMember(i, { role: val })}
                     onRemove={() => removeMember(i)}

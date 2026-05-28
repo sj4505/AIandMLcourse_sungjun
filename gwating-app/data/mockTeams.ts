@@ -2,15 +2,16 @@ import { TeamProfile } from "@/types/matching";
 
 export const mockTeams: TeamProfile[] = [
   {
-    teamName: "용두산 삼총사",
+    teamName: "물리과 F3",
     school: "부산대학교",
     region: "부산",
     size: 3,
     ageRange: "22~23",
     mood: "comfortableTalk",
+    availableTimes: ["fri-evening", "sat-afternoon"],
     members: [
       {
-        nickname: "민준",
+        nickname: "민지",
         role: "coordinator",
         isLeader: true,
         traits: {
@@ -22,16 +23,17 @@ export const mockTeams: TeamProfile[] = [
         },
       },
       { nickname: "서연", role: "coordinator" },
-      { nickname: "지호", role: "considerate" },
+      { nickname: "지우", role: "considerate" },
     ],
   },
   {
-    teamName: "남포동 클럽",
+    teamName: "경영과 텐션업",
     school: "부산대학교",
     region: "부산",
     size: 4,
     ageRange: "21~24",
     mood: "activeSocial",
+    availableTimes: ["sat-afternoon", "sat-evening"],
     members: [
       {
         nickname: "현우",
@@ -45,21 +47,22 @@ export const mockTeams: TeamProfile[] = [
           communicationBalance: 4,
         },
       },
-      { nickname: "은지", role: "moodMaker" },
-      { nickname: "태양", role: "reactor" },
-      { nickname: "소희", role: "reactor" },
+      { nickname: "대지", role: "moodMaker" },
+      { nickname: "서양", role: "reactor" },
+      { nickname: "태훈", role: "reactor" },
     ],
   },
   {
-    teamName: "해운대 게임단",
+    teamName: "컴공과 게임팟",
     school: "부산대학교",
     region: "부산",
     size: 3,
     ageRange: "22~24",
     mood: "gamesAndDrinks",
+    availableTimes: ["fri-evening", "sat-evening"],
     members: [
       {
-        nickname: "준혁",
+        nickname: "준호",
         role: "moodMaker",
         isLeader: true,
         traits: {
@@ -70,20 +73,21 @@ export const mockTeams: TeamProfile[] = [
           communicationBalance: 3,
         },
       },
-      { nickname: "다은", role: "reactor" },
+      { nickname: "다솔", role: "reactor" },
       { nickname: "성민", role: "reactor" },
     ],
   },
   {
-    teamName: "온천장 신사단",
+    teamName: "화학과 젠틀즈",
     school: "부산대학교",
     region: "부산",
     size: 3,
     ageRange: "21~22",
     mood: "respectfulSafe",
+    availableTimes: ["sun-afternoon"],
     members: [
       {
-        nickname: "도윤",
+        nickname: "아윤",
         role: "considerate",
         isLeader: true,
         traits: {
@@ -94,20 +98,21 @@ export const mockTeams: TeamProfile[] = [
           communicationBalance: 4,
         },
       },
-      { nickname: "나연", role: "considerate" },
-      { nickname: "재원", role: "coordinator" },
+      { nickname: "서연", role: "considerate" },
+      { nickname: "수원", role: "coordinator" },
     ],
   },
   {
-    teamName: "서면 인트로",
+    teamName: "영문과 첫만남",
     school: "부산대학교",
     region: "부산",
     size: 4,
     ageRange: "20~23",
     mood: "naturalIntro",
+    availableTimes: ["sat-afternoon", "sun-afternoon"],
     members: [
       {
-        nickname: "수아",
+        nickname: "하아",
         role: "coordinator",
         isLeader: true,
         traits: {

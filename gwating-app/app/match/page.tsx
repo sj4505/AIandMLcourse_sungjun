@@ -49,7 +49,7 @@ export default function MatchPage() {
         <div className="max-w-[640px] mx-auto">
           <h1 className="text-2xl font-bold text-ink mb-1">추천 과팅 팀</h1>
           <p className="text-sm text-muted mb-8">
-            <span className="font-semibold text-ink">{myTeam.teamName}</span>과 잘 어울릴 팀을 분위기·역할·조건 궁합으로 추천했어요.
+            <span className="font-semibold text-ink">{myTeam.teamName}</span>과 잘 맞을 가능성이 높은 팀을 추천했어요.
           </p>
           <div className="flex flex-col gap-4">
             {results.map((result, i) => (

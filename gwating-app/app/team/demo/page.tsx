@@ -38,7 +38,7 @@ export default function TeamDemoPage() {
       <main className="py-10 px-4 bg-canvas-warm min-h-screen">
         <div className="max-w-[560px] mx-auto">
           <h1 className="text-2xl font-bold text-ink mb-1">우리 팀 프로필</h1>
-          <p className="text-sm text-muted mb-8">이 팀으로 매칭을 진행할게요</p>
+          <p className="text-sm text-muted mb-8">이 팀으로 매칭을 진행할게요.</p>
           <TeamProfileCard team={team} />
           <div className="mt-6 flex flex-col gap-3">
             <Button fullWidth onClick={() => router.push("/match")}>

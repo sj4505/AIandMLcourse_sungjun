@@ -18,32 +18,36 @@ export type MemberRole =
   | "considerate"
   | "reactor";
 
+export type TraitScores = Record<TraitKey, number>;
+
 export type TeamMember = {
   nickname: string;
   role: MemberRole;
-  traits?: Record<TraitKey, number>;
+  traits?: TraitScores;
   isLeader?: boolean;
 };
 
 export type UserProfile = {
   nickname: string;
-  traits: Record<TraitKey, number>;
+  traits: TraitScores;
 };
 
 export type TeamProfile = {
   teamName: string;
-  school: "부산대학교";
-  region: "부산";
+  school: string;
+  region: string;
   size: number;
   ageRange: string;
   mood: MoodKey;
   members: TeamMember[];
+  availableTimes?: string[];
 };
 
 export type MatchResult = {
   team: TeamProfile;
   score: number;
   vibeScore: number;
+  traitScore: number;
   roleScore: number;
   conditionScore: number;
   reasons: string[];

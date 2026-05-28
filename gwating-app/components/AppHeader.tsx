@@ -10,7 +10,7 @@ export function AppHeader({ step, totalSteps }: Props) {
     <header className="h-14 md:h-16 border-b border-hairline-soft bg-white sticky top-0 z-10">
       <div className="max-w-[1120px] mx-auto px-4 h-full flex items-center justify-between">
         <Link href="/" className="flex items-center gap-1.5">
-          <span className="text-primary font-bold text-xl leading-none">●</span>
+          <span className="text-primary font-bold text-xl leading-none">GW</span>
           <span className="font-bold text-ink text-base">부산대 과팅</span>
           <span className="text-xs text-muted border border-hairline rounded-full px-2 py-0.5 ml-1">
             베타

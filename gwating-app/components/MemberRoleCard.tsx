@@ -1,10 +1,10 @@
 import { MemberRole } from "@/types/matching";
 
 const ROLES: { value: MemberRole; label: string; emoji: string }[] = [
-  { value: "moodMaker",   label: "분위기 메이커형", emoji: "🔥" },
-  { value: "coordinator", label: "조율자형",         emoji: "🎯" },
-  { value: "considerate", label: "배려형",            emoji: "🤍" },
-  { value: "reactor",     label: "리액션형",          emoji: "✨" },
+  { value: "moodMaker", label: "분위기 메이커형", emoji: "🎉" },
+  { value: "coordinator", label: "조율자형", emoji: "🧭" },
+  { value: "considerate", label: "배려형", emoji: "🤝" },
+  { value: "reactor", label: "리액션형", emoji: "👏" },
 ];
 
 type Props = {
@@ -40,20 +40,20 @@ export function MemberRoleCard({
         className="w-full border border-hairline rounded-sm px-3 h-10 text-sm text-ink mb-3 focus:outline-none focus:border-primary bg-white"
       />
       <div className="grid grid-cols-2 gap-2">
-        {ROLES.map((r) => (
+        {ROLES.map((item) => (
           <button
-            key={r.value}
+            key={item.value}
             type="button"
-            onClick={() => onRoleChange(r.value)}
+            onClick={() => onRoleChange(item.value)}
             className={`
               flex items-center gap-1.5 px-3 py-2 rounded-sm border text-xs font-semibold transition-all
-              ${role === r.value
+              ${role === item.value
                 ? "bg-primary-soft border-primary text-primary"
                 : "bg-white border-hairline text-muted hover:border-body"}
             `}
           >
-            <span>{r.emoji}</span>
-            <span>{r.label}</span>
+            <span>{item.emoji}</span>
+            <span>{item.label}</span>
           </button>
         ))}
       </div>

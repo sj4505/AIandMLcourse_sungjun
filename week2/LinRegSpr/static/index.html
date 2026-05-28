@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ko" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hooke's Law — AI Linear Regression</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'bg-primary':  '#0f0e17',
+            'bg-card':     '#1a1933',
+            'bg-panel':    '#13122a',
+            'accent-cyan': '#00d4ff',
+            'accent-green':'#00ff88',
+            'accent-gold': '#ffd700',
+            'accent-red':  '#ff4757',
+            'text-pri':    '#fffffe',
+            'text-sec':    '#a7a9be',
+            'border-dim':  '#2d2b55',
+          },
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'Fira Code', 'monospace'],
+          },
+          boxShadow: {
+            'glow-cyan':  '0 0 20px rgba(0,212,255,0.3)',
+            'glow-gold':  '0 0 20px rgba(255,215,0,0.3)',
+            'glow-green': '0 0 20px rgba(0,255,136,0.3)',
+          },
+          animation: {
+            'pulse-slow':   'pulse 3s cubic-bezier(0.4,0,0.6,1) infinite',
+            'fade-in':      'fadeIn 0.6s ease forwards',
+            'slide-up':     'slideUp 0.5s ease forwards',
+            'spin-slow':    'spin 2s linear infinite',
+          },
+          keyframes: {
+            fadeIn:  { '0%': {opacity:'0'}, '100%': {opacity:'1'} },
+            slideUp: { '0%': {opacity:'0', transform:'translateY(20px)'}, '100%': {opacity:'1', transform:'translateY(0)'} },
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    body { background-color: #0f0e17; color: #fffffe; font-family: 'Inter', sans-serif; }
+
+    /* ── Gradient text ── */
+    .gradient-text {
+      background: linear-gradient(135deg, #00d4ff 0%, #00ff88 50%, #ffd700 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+
+    /* ── Formula box ── */
+    .formula-box {
+      background: linear-gradient(135deg, rgba(0,212,255,0.08), rgba(0,255,136,0.08));
+      border: 1px solid rgba(0,212,255,0.3);
+      border-radius: 12px;
+    }
+
+    /* ── Glow button ── */
+    .btn-train {
+      background: linear-gradient(135deg, #00d4ff, #0099cc);
+      transition: all 0.3s ease;
+      position: relative; overflow: hidden;
+    }
+    .btn-train::before {
+      content:''; position:absolute; inset:0;
+      background: linear-gradient(135deg, #00ff88, #00d4ff);
+      opacity:0; transition: opacity 0.3s;
+    }
+    .btn-train:hover::before { opacity:1; }
+    .btn-train:hover { box-shadow: 0 0 30px rgba(0,212,255,0.5); transform: translateY(-2px); }
+    .btn-train:active { transform: translateY(0); }
+
+    .btn-predict {
+      background: linear-gradient(135deg, #ffd700, #ff8c00);
+      transition: all 0.3s ease;
+    }
+    .btn-predict:hover { box-shadow: 0 0 30px rgba(255,215,0,0.5); transform: translateY(-2px); }
+    .btn-predict:disabled { opacity:0.4; cursor:not-allowed; transform:none; box-shadow:none; }
+
+    /* ── Card ── */
+    .card {
+      background: #1a1933;
+      border: 1px solid #2d2b55;
+      border-radius: 16px;
+      transition: border-color 0.3s;
+    }
+    .card:hover { border-color: rgba(0,212,255,0.4); }
+
+    /* ── Image viewer ── */
+    .img-viewer {
+      background: #13122a;
+      border: 1px solid #2d2b55;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s;
+      position: relative;
+    }
+    .img-viewer:hover { border-color: #00d4ff; box-shadow: 0 0 20px rgba(0,212,255,0.2); }
+    .img-viewer img { width:100%; display:block; transition: transform 0.3s; }
+    .img-viewer:hover img { transform: scale(1.02); }
+    .img-viewer .overlay {
+      position:absolute; inset:0; background:rgba(0,0,0,0.5);
+      display:flex; align-items:center; justify-content:center;
+      opacity:0; transition:opacity 0.3s;
+    }
+    .img-viewer:hover .overlay { opacity:1; }
+
+    /* ── Range slider ── */
+    input[type=range] { -webkit-appearance:none; width:100%; height:6px; background:#2d2b55; border-radius:3px; outline:none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; background:#00d4ff; border-radius:50%; cursor:pointer; box-shadow:0 0 8px rgba(0,212,255,0.6); }
+    input[type=range]::-moz-range-thumb { width:18px; height:18px; background:#00d4ff; border:none; border-radius:50%; cursor:pointer; }
+
+    /* ── Number input ── */
+    input[type=number] { background:#13122a; border:1px solid #2d2b55; color:#fffffe; border-radius:8px; padding:10px 14px; outline:none; transition:border-color 0.3s; }
+    input[type=number]:focus { border-color:#00d4ff; box-shadow:0 0 10px rgba(0,212,255,0.2); }
+    input[type=number]::-webkit-inner-spin-button { filter:invert(1); }
+
+    /* ── Modal ── */
+    #modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000; align-items:center; justify-content:center; }
+    #modal.show { display:flex; }
+    #modal img { max-width:90vw; max-height:90vh; border-radius:12px; box-shadow:0 0 60px rgba(0,212,255,0.3); }
+
+    /* ── Particle dots background ── */
+    .hero-bg { position:relative; overflow:hidden; }
+    .hero-bg::before {
+      content:''; position:absolute; inset:0;
+      background: radial-gradient(circle at 20% 50%, rgba(0,212,255,0.06) 0%, transparent 50%),
+                  radial-gradient(circle at 80% 20%, rgba(0,255,136,0.06) 0%, transparent 50%),
+                  radial-gradient(circle at 60% 80%, rgba(255,215,0,0.04) 0%, transparent 50%);
+    }
+
+    /* ── Status badge ── */
+    .badge-trained   { background:rgba(0,255,136,0.15); border:1px solid rgba(0,255,136,0.4); color:#00ff88; }
+    .badge-untrained { background:rgba(167,169,190,0.1); border:1px solid rgba(167,169,190,0.3); color:#a7a9be; }
+    .badge-training  { background:rgba(0,212,255,0.15); border:1px solid rgba(0,212,255,0.4); color:#00d4ff; }
+
+    /* ── Metric card ── */
+    .metric { background:rgba(0,0,0,0.3); border:1px solid #2d2b55; border-radius:10px; padding:12px 16px; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width:6px; } ::-webkit-scrollbar-track { background:#0f0e17; }
+    ::-webkit-scrollbar-thumb { background:#2d2b55; border-radius:3px; }
+    ::-webkit-scrollbar-thumb:hover { background:#00d4ff; }
+
+    /* ── Spring animation ── */
+    @keyframes springBounce {
+      0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.1); }
+    }
+    .spring-icon { animation: springBounce 2s ease-in-out infinite; display:inline-block; }
+
+    /* ── Progress bar ── */
+    .progress-bar { background:#2d2b55; border-radius:4px; overflow:hidden; height:8px; }
+    .progress-fill { height:100%; background:linear-gradient(90deg,#00d4ff,#00ff88); border-radius:4px; transition:width 0.3s ease; }
+  </style>
+</head>
+
+<body class="min-h-screen">
+
+<!-- ── Hero / Header ──────────────────────────────────────────────────────── -->
+<header class="hero-bg border-b border-border-dim">
+  <div class="max-w-7xl mx-auto px-6 py-10">
+    <!-- Nav bar -->
+    <div class="flex items-center justify-between mb-8">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg" style="background:linear-gradient(135deg,#00d4ff,#00ff88)">
+          🌊
+        </div>
+        <span class="font-mono font-bold text-lg tracking-tight text-text-pri">HookeLab</span>
+        <span class="text-xs px-2 py-0.5 rounded-full font-mono" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;">v1.0</span>
+      </div>
+      <div id="statusBadge" class="badge-untrained text-xs font-mono px-3 py-1.5 rounded-full flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-current opacity-60"></span>
+        <span id="statusText">Not Trained</span>
+      </div>
+    </div>
+
+    <!-- Title & formula -->
+    <div class="grid md:grid-cols-2 gap-8 items-center">
+      <div>
+        <h1 class="text-4xl md:text-5xl font-bold mb-4 leading-tight">
+          <span class="gradient-text">Hooke's Law</span><br/>
+          <span class="text-text-pri text-3xl">AI Linear Regression</span>
+        </h1>
+        <p class="text-text-sec text-base leading-relaxed mb-6">
+          TensorFlow로 훅의 법칙을 학습합니다. 질량에 따른 스프링 늘어남을 <br/>
+          선형회귀 모델로 예측하고, 학습 과정을 실시간으로 시각화합니다.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <span class="text-xs px-3 py-1 rounded-full font-mono" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:#00d4ff;">TensorFlow 2.x</span>
+          <span class="text-xs px-3 py-1 rounded-full font-mono" style="background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.2);color:#00ff88;">FastAPI</span>
+          <span class="text-xs px-3 py-1 rounded-full font-mono" style="background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.2);color:#ffd700;">Linear Regression</span>
+        </div>
+      </div>
+
+      <!-- Formula cards -->
+      <div class="grid grid-cols-2 gap-4">
+        <div class="formula-box p-4">
+          <div class="text-xs text-text-sec font-mono mb-2">Hooke's Law</div>
+          <div class="text-2xl font-mono font-bold text-accent-cyan">F = kx</div>
+          <div class="text-xs text-text-sec mt-2">힘 = 스프링 상수 × 변위</div>
+        </div>
+        <div class="formula-box p-4">
+          <div class="text-xs text-text-sec font-mono mb-2">Our Model</div>
+          <div class="text-lg font-mono font-bold text-accent-green">L = 2w + 10</div>
+          <div class="text-xs text-text-sec mt-2">k = 2 cm/kg, L₀ = 10 cm</div>
+        </div>
+        <div class="formula-box p-4 col-span-2">
+          <div class="text-xs text-text-sec font-mono mb-2">Dataset (week2 data)</div>
+          <div class="font-mono text-sm text-text-pri">
+            w ∈ {0,1,...,10} kg<br/>
+            <span class="text-text-sec">+ Normal noise (σ=1.5)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Main Content ────────────────────────────────────────────────────────── -->
+<main class="max-w-7xl mx-auto px-6 py-8">
+  <div class="grid lg:grid-cols-3 gap-6">
+
+    <!-- ── LEFT: Control Panel ── -->
+    <aside class="lg:col-span-1 space-y-5">
+
+      <!-- Training config -->
+      <div class="card p-5">
+        <h2 class="text-sm font-semibold text-text-sec uppercase tracking-widest mb-4 flex items-center gap-2">
+          <span>⚙️</span> Training Config
+        </h2>
+
+        <!-- Epochs slider -->
+        <div class="mb-5">
+          <div class="flex justify-between mb-2">
+            <label class="text-sm text-text-pri font-medium">Epochs</label>
+            <span id="epochsVal" class="font-mono text-accent-cyan text-sm font-bold">500</span>
+          </div>
+          <input type="range" id="epochsSlider" min="50" max="2000" step="50" value="500"
+            oninput="document.getElementById('epochsVal').textContent=this.value" />
+          <div class="flex justify-between mt-1 text-xs text-text-sec font-mono">
+            <span>50</span><span>2000</span>
+          </div>
+        </div>
+
+        <!-- New mass input -->
+        <div class="mb-5">
+          <label class="block text-sm text-text-pri font-medium mb-2">
+            Predict Mass (kg)
+            <span class="text-text-sec text-xs ml-1">— for spring fitting plot</span>
+          </label>
+          <div class="flex items-center gap-2">
+            <input type="number" id="massInput" value="15" min="0.1" max="500" step="0.5"
+              class="w-full text-sm" />
+            <span class="text-text-sec text-sm font-mono whitespace-nowrap">kg</span>
+          </div>
+        </div>
+
+        <!-- Train button -->
+        <button id="trainBtn" onclick="startTraining()"
+          class="btn-train w-full py-3 px-4 rounded-xl font-bold text-sm text-white relative z-10 flex items-center justify-center gap-2">
+          <span id="trainIcon">🚀</span>
+          <span id="trainLabel">Train Model</span>
+        </button>
+
+        <!-- Progress -->
+        <div id="progressWrap" class="hidden mt-4">
+          <div class="flex justify-between text-xs text-text-sec mb-1">
+            <span>Training in progress...</span>
+            <span id="progressPct">0%</span>
+          </div>
+          <div class="progress-bar">
+            <div id="progressFill" class="progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prediction panel -->
+      <div class="card p-5">
+        <h2 class="text-sm font-semibold text-text-sec uppercase tracking-widest mb-4 flex items-center gap-2">
+          <span>🔮</span> Predict Length
+        </h2>
+        <div class="mb-4">
+          <label class="block text-sm text-text-pri font-medium mb-2">New Mass (kg)</label>
+          <div class="flex gap-2">
+            <input type="number" id="predictMass" value="15" min="0.1" max="500" step="0.5" class="flex-1 text-sm" />
+            <button id="predictBtn" onclick="runPredict()" disabled
+              class="btn-predict px-4 py-2 rounded-xl font-bold text-sm text-gray-900 flex items-center gap-1">
+              <span>▶</span> Go
+            </button>
+          </div>
+        </div>
+
+        <!-- Result -->
+        <div id="predictResult" class="hidden mt-4 p-4 rounded-xl" style="background:rgba(255,215,0,0.05);border:1px solid rgba(255,215,0,0.3);">
+          <div class="text-xs text-text-sec font-mono mb-1">Predicted Length</div>
+          <div id="predictedVal" class="text-3xl font-bold font-mono text-accent-gold">— cm</div>
+          <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span class="text-text-sec">Theoretical</span>
+              <div id="theoreticalVal" class="text-accent-green font-mono font-semibold">—</div>
+            </div>
+            <div>
+              <span class="text-text-sec">Error</span>
+              <div id="errorVal" class="text-accent-red font-mono font-semibold">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Model params -->
+      <div id="modelParams" class="card p-5 hidden">
+        <h2 class="text-sm font-semibold text-text-sec uppercase tracking-widest mb-4 flex items-center gap-2">
+          <span>📐</span> Learned Parameters
+        </h2>
+        <div class="space-y-3">
+          <div class="metric">
+            <div class="text-xs text-text-sec mb-1">Equation</div>
+            <div id="paramEquation" class="font-mono text-sm text-accent-cyan font-semibold">—</div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="metric">
+              <div class="text-xs text-text-sec mb-1">Slope (k)</div>
+              <div id="paramSlope" class="font-mono text-lg font-bold text-accent-green">—</div>
+              <div class="text-xs text-text-sec mt-0.5">True: 2.00</div>
+            </div>
+            <div class="metric">
+              <div class="text-xs text-text-sec mb-1">Intercept (L₀)</div>
+              <div id="paramIntercept" class="font-mono text-lg font-bold text-accent-green">—</div>
+              <div class="text-xs text-text-sec mt-0.5">True: 10.00</div>
+            </div>
+          </div>
+          <div class="metric">
+            <div class="text-xs text-text-sec mb-1">Final Loss (MSE)</div>
+            <div id="paramLoss" class="font-mono text-lg font-bold text-accent-gold">—</div>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ── RIGHT: Visualization ── -->
+    <section class="lg:col-span-2 space-y-5">
+
+      <!-- Empty state -->
+      <div id="emptyState" class="card p-12 text-center">
+        <div class="spring-icon text-6xl mb-6">🌀</div>
+        <h3 class="text-xl font-semibold text-text-pri mb-2">Ready to Learn</h3>
+        <p class="text-text-sec text-sm mb-6 max-w-sm mx-auto">
+          왼쪽 패널에서 Epoch 수와 예측할 질량을 설정하고<br/>
+          <strong class="text-accent-cyan">Train Model</strong>을 클릭하면 TensorFlow가<br/>
+          훅의 법칙을 학습합니다.
+        </p>
+        <div class="flex flex-wrap justify-center gap-3 text-xs text-text-sec font-mono">
+          <span class="px-3 py-1 rounded-full" style="background:#13122a;border:1px solid #2d2b55;">① Set epochs</span>
+          <span class="text-border-dim">→</span>
+          <span class="px-3 py-1 rounded-full" style="background:#13122a;border:1px solid #2d2b55;">② Set mass</span>
+          <span class="text-border-dim">→</span>
+          <span class="px-3 py-1 rounded-full" style="background:#13122a;border:1px solid #2d2b55;">③ Train</span>
+          <span class="text-border-dim">→</span>
+          <span class="px-3 py-1 rounded-full" style="background:#13122a;border:1px solid #2d2b55;">④ Predict</span>
+        </div>
+      </div>
+
+      <!-- Image viewers (hidden until trained) -->
+      <div id="vizSection" class="hidden space-y-5 animate-fade-in">
+
+        <!-- Title row -->
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-text-pri">Visualization Results</h2>
+          <button onclick="refreshImages()"
+            class="text-xs px-3 py-1.5 rounded-lg font-mono text-text-sec hover:text-accent-cyan transition-colors"
+            style="background:#13122a;border:1px solid #2d2b55;">
+            ↺ Refresh
+          </button>
+        </div>
+
+        <!-- Image grid -->
+        <div class="grid md:grid-cols-2 gap-4">
+          <!-- Loss curve -->
+          <div>
+            <div class="text-xs font-mono text-text-sec mb-2 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-accent-cyan"></span>
+              output/loss_curve.png
+            </div>
+            <div class="img-viewer" onclick="openModal('/images/loss_curve.png')">
+              <img id="lossImg" src="" alt="Loss Curve" />
+              <div class="overlay text-white text-sm font-semibold">🔍 Click to expand</div>
+            </div>
+          </div>
+          <!-- Spring fitting -->
+          <div>
+            <div class="text-xs font-mono text-text-sec mb-2 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-accent-red"></span>
+              output/spring_fitting.png
+            </div>
+            <div class="img-viewer" onclick="openModal('/images/spring_fitting.png')">
+              <img id="fittingImg" src="" alt="Spring Fitting" />
+              <div class="overlay text-white text-sm font-semibold">🔍 Click to expand</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loss chart (inline Chart.js) -->
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-text-sec uppercase tracking-widest">
+              Loss History (Interactive)
+            </h3>
+            <span class="text-xs text-text-sec font-mono">Every 5 epochs shown</span>
+          </div>
+          <canvas id="lossChart" height="160"></canvas>
+        </div>
+
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- ── Physics Info Section ────────────────────────────────────────────────── -->
+<section class="max-w-7xl mx-auto px-6 pb-12 mt-4">
+  <div class="card p-6">
+    <h2 class="text-base font-semibold text-text-pri mb-4 flex items-center gap-2">
+      <span>📚</span> About Hooke's Law & This Model
+    </h2>
+    <div class="grid md:grid-cols-3 gap-6 text-sm text-text-sec">
+      <div>
+        <div class="text-accent-cyan font-semibold mb-2">훅의 법칙 (Hooke's Law)</div>
+        <p class="leading-relaxed">
+          영국 물리학자 로버트 훅이 1676년 발견. 탄성 범위 내에서 스프링의
+          변형량은 가해진 힘에 비례합니다. <strong class="text-text-pri">F = kx</strong>
+          (k: 스프링 상수, x: 변위)
+        </p>
+      </div>
+      <div>
+        <div class="text-accent-green font-semibold mb-2">데이터셋 설정</div>
+        <p class="leading-relaxed">
+          초기 길이 10 cm, 스프링 상수 k = 2 cm/kg. 0~10 kg 추를 달았을 때
+          이상적인 길이에 표준편차 1.5의 정규 노이즈를 추가해 측정 오차를 시뮬레이션합니다.
+        </p>
+      </div>
+      <div>
+        <div class="text-accent-gold font-semibold mb-2">TensorFlow 모델</div>
+        <p class="leading-relaxed">
+          Dense(1) 단층 선형 뉴럴넷으로 <strong class="text-text-pri">y = wx + b</strong>를
+          학습. Adam optimizer (lr=0.01), MSE Loss. 충분한 학습 후
+          w≈2, b≈10으로 수렴합니다.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Image Modal ─────────────────────────────────────────────────────────── -->
+<div id="modal" onclick="closeModal()">
+  <div style="position:relative">
+    <img id="modalImg" src="" alt="" />
+    <button onclick="closeModal()"
+      style="position:absolute;top:-12px;right:-12px;background:#ff4757;border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;font-weight:bold;">✕</button>
+  </div>
+</div>
+
+<!-- ── Chart.js CDN ────────────────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+  let lossChartInstance = null;
+
+  // ── Modal ──────────────────────────────────────────────────────────────────
+  function openModal(src) {
+    document.getElementById('modalImg').src = src + '?t=' + Date.now();
+    document.getElementById('modal').classList.add('show');
+  }
+  function closeModal() {
+    document.getElementById('modal').classList.remove('show');
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  // ── Status badge ───────────────────────────────────────────────────────────
+  function setStatus(type, label) {
+    const el = document.getElementById('statusBadge');
+    el.className = 'text-xs font-mono px-3 py-1.5 rounded-full flex items-center gap-2 ' +
+      (type === 'trained'   ? 'badge-trained'   :
+       type === 'training'  ? 'badge-training'  : 'badge-untrained');
+    document.getElementById('statusText').textContent = label;
+  }
+
+  // ── Training ───────────────────────────────────────────────────────────────
+  async function startTraining() {
+    const epochs = parseInt(document.getElementById('epochsSlider').value);
+    const mass   = parseFloat(document.getElementById('massInput').value);
+
+    const btn   = document.getElementById('trainBtn');
+    const icon  = document.getElementById('trainIcon');
+    const label = document.getElementById('trainLabel');
+
+    btn.disabled = true;
+    icon.innerHTML  = '<svg class="w-4 h-4 animate-spin-slow" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>';
+    label.textContent = 'Training...';
+    setStatus('training', 'Training...');
+
+    // Fake progress animation
+    const wrap = document.getElementById('progressWrap');
+    const fill = document.getElementById('progressFill');
+    const pct  = document.getElementById('progressPct');
+    wrap.classList.remove('hidden');
+    let prog = 0;
+    const ticker = setInterval(() => {
+      prog = Math.min(prog + Math.random() * 3, 92);
+      fill.style.width = prog + '%';
+      pct.textContent = Math.round(prog) + '%';
+    }, 200);
+
+    try {
+      const res = await fetch('/train', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ epochs, new_mass_kg: mass })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+
+      clearInterval(ticker);
+      fill.style.width = '100%'; pct.textContent = '100%';
+      setTimeout(() => wrap.classList.add('hidden'), 800);
+
+      // Show results
+      showResults(data);
+      setStatus('trained', 'Model Trained ✓');
+
+    } catch (err) {
+      clearInterval(ticker);
+      wrap.classList.add('hidden');
+      setStatus('untrained', 'Error — retry');
+      alert('Training failed: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      icon.innerHTML = '🚀';
+      label.textContent = 'Re-train Model';
+    }
+  }
+
+  function showResults(data) {
+    // Enable predict
+    document.getElementById('predictBtn').disabled = false;
+
+    // Show viz section
+    document.getElementById('emptyState').classList.add('hidden');
+    document.getElementById('vizSection').classList.remove('hidden');
+
+    // Load images with cache bust
+    const ts = Date.now();
+    document.getElementById('lossImg').src    = '/images/loss_curve.png?t='    + ts;
+    document.getElementById('fittingImg').src = '/images/spring_fitting.png?t=' + ts;
+
+    // Show model params card
+    document.getElementById('modelParams').classList.remove('hidden');
+    document.getElementById('paramEquation').textContent  = data.model_equation;
+    document.getElementById('paramSlope').textContent     = data.slope.toFixed(4);
+    document.getElementById('paramIntercept').textContent = data.intercept.toFixed(4);
+    document.getElementById('paramLoss').textContent      = data.final_loss.toFixed(6);
+
+    // Draw inline chart
+    drawLossChart(data.loss_history, data.epochs);
+
+    // Show prediction if available
+    if (data.predicted_length) {
+      const mass = parseFloat(document.getElementById('massInput').value);
+      document.getElementById('predictMass').value = mass;
+      showPredictResult({
+        predicted_length_cm:   data.predicted_length,
+        theoretical_length_cm: 2 * mass + 10,
+        error_cm:              Math.abs(data.predicted_length - (2 * mass + 10))
+      });
+    }
+  }
+
+  // ── Inline Loss Chart ──────────────────────────────────────────────────────
+  function drawLossChart(lossHistory, epochs) {
+    if (lossChartInstance) { lossChartInstance.destroy(); }
+    const step = Math.max(1, Math.floor(epochs / lossHistory.length));
+    const labels = lossHistory.map((_, i) => ((i + 1) * step));
+    const ctx = document.getElementById('lossChart').getContext('2d');
+    lossChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'MSE Loss',
+          data: lossHistory,
+          borderColor: '#00d4ff',
+          backgroundColor: 'rgba(0,212,255,0.06)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: '#a7a9be', font: { family: 'JetBrains Mono', size: 11 } } },
+          tooltip: {
+            backgroundColor: '#1a1933',
+            titleColor: '#00d4ff',
+            bodyColor: '#fffffe',
+            borderColor: '#2d2b55',
+            borderWidth: 1,
+            callbacks: { label: ctx => `Loss: ${ctx.raw.toFixed(6)}` }
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#a7a9be', font: { size: 10 } }, grid: { color: 'rgba(45,43,85,0.5)' } },
+          y: { type: 'logarithmic', ticks: { color: '#a7a9be', font: { size: 10 } }, grid: { color: 'rgba(45,43,85,0.5)' } }
+        }
+      }
+    });
+  }
+
+  // ── Prediction ─────────────────────────────────────────────────────────────
+  async function runPredict() {
+    const mass = parseFloat(document.getElementById('predictMass').value);
+    try {
+      const res = await fetch('/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mass_kg: mass })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      showPredictResult(data);
+    } catch (err) {
+      alert('Prediction failed: ' + err.message);
+    }
+  }
+
+  function showPredictResult(data) {
+    document.getElementById('predictResult').classList.remove('hidden');
+    document.getElementById('predictedVal').textContent     = data.predicted_length_cm.toFixed(2) + ' cm';
+    document.getElementById('theoreticalVal').textContent   = data.theoretical_length_cm.toFixed(2) + ' cm';
+    document.getElementById('errorVal').textContent         = '±' + data.error_cm.toFixed(4) + ' cm';
+  }
+
+  // ── Refresh images ─────────────────────────────────────────────────────────
+  function refreshImages() {
+    const ts = Date.now();
+    document.getElementById('lossImg').src    = '/images/loss_curve.png?t='    + ts;
+    document.getElementById('fittingImg').src = '/images/spring_fitting.png?t=' + ts;
+  }
+
+  // ── Init: check status ─────────────────────────────────────────────────────
+  (async () => {
+    try {
+      const res = await fetch('/status');
+      const data = await res.json();
+      if (data.is_trained) {
+        setStatus('trained', 'Model Trained ✓');
+        document.getElementById('predictBtn').disabled = false;
+        document.getElementById('emptyState').classList.add('hidden');
+        document.getElementById('vizSection').classList.remove('hidden');
+        document.getElementById('modelParams').classList.remove('hidden');
+        document.getElementById('paramEquation').textContent  = data.model_equation;
+        document.getElementById('paramSlope').textContent     = data.slope.toFixed(4);
+        document.getElementById('paramIntercept').textContent = data.intercept.toFixed(4);
+        refreshImages();
+      }
+    } catch (_) {}
+  })();
+</script>
+</body>
+</html>

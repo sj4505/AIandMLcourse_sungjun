@@ -91,3 +91,4 @@ plt.grid(True)
 save_path = os.path.join(output_dir, 'spring_fitting.png')
 plt.savefig(save_path)
 print(f"\n그래프가 저장되었습니다: {save_path}")
+
