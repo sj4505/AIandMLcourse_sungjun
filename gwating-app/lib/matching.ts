@@ -1,71 +1,39 @@
-import { MatchResult, MoodKey, TeamProfile } from "@/types/matching";
+import { TeamProfile, MatchResult, MoodKey } from "@/types/matching";
 import { moodWeights } from "@/data/moodWeights";
-import {
-  buildRoleVector,
-  clamp01,
-  clampScore,
-  roleBalanceScore,
-  roleComplementarityScore,
-  traitSimilarityScore,
-} from "@/lib/scoring";
+import { buildRoleVector, roleComplementarityScore } from "@/lib/scoring";
 
 const MOOD_LABELS: Record<MoodKey, string> = {
   comfortableTalk: "편한 대화형",
-  activeSocial: "활발한 친목형",
-  gamesAndDrinks: "게임/술자리형",
-  respectfulSafe: "예의/안전 중시형",
-  naturalIntro: "자연스러운 소개팅형",
+  activeSocial:    "활발한 친목형",
+  gamesAndDrinks:  "게임/술자리형",
+  respectfulSafe:  "예의/안전 중시형",
+  naturalIntro:    "자연스러운 소개팅형",
 };
 
 function calcVibeScore(myMood: MoodKey, theirMood: MoodKey): number {
-  return clamp01(moodWeights[myMood]?.[theirMood] ?? 0.5);
+  return moodWeights[myMood][theirMood];
 }
 
-function calcRoleScore(my: TeamProfile, their: TeamProfile): number {
-  const myBalance = roleBalanceScore(my.members);
-  const theirBalance = roleBalanceScore(their.members);
-  const complementarity = roleComplementarityScore(
+function calcRoleBalanceScore(my: TeamProfile, their: TeamProfile): number {
+  return roleComplementarityScore(
     buildRoleVector(my.members),
     buildRoleVector(their.members)
   );
-
-  return clamp01(myBalance * 0.25 + theirBalance * 0.35 + complementarity * 0.4);
-}
-
-function parseRange(range: string): [number, number] | null {
-  const match = range.match(/(\d{1,2})\s*~\s*(\d{1,2})/);
-  if (!match) return null;
-
-  const min = Number(match[1]);
-  const max = Number(match[2]);
-  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
-  return [Math.min(min, max), Math.max(min, max)];
-}
-
-function calcAgeOverlapScore(myRange: string, theirRange: string): number {
-  const my = parseRange(myRange);
-  const their = parseRange(theirRange);
-  if (!my || !their) return 0.5;
-
-  const overlap = Math.max(0, Math.min(my[1], their[1]) - Math.max(my[0], their[0]) + 1);
-  const span = Math.max(my[1], their[1]) - Math.min(my[0], their[0]) + 1;
-  return clamp01(span > 0 ? overlap / span : 0);
-}
-
-function calcTimeScore(myTimes?: string[], theirTimes?: string[]): number {
-  if (!myTimes?.length || !theirTimes?.length) return 0.5;
-  const theirSet = new Set(theirTimes);
-  const overlap = myTimes.filter((time) => theirSet.has(time)).length;
-  return clamp01(overlap / Math.max(myTimes.length, theirTimes.length));
 }
 
 function calcConditionScore(my: TeamProfile, their: TeamProfile): number {
-  const sizeDiff = Math.abs((my.size || my.members.length) - (their.size || their.members.length));
-  const sizeScore = sizeDiff === 0 ? 1 : sizeDiff === 1 ? 0.5 : 0;
-  const ageScore = calcAgeOverlapScore(my.ageRange, their.ageRange);
-  const timeScore = calcTimeScore(my.availableTimes, their.availableTimes);
+  const sizeDiff = Math.abs(my.size - their.size);
+  const sizeScore = sizeDiff === 0 ? 1.0 : sizeDiff === 1 ? 0.5 : 0.0;
 
-  return clamp01(sizeScore * 0.4 + ageScore * 0.3 + timeScore * 0.3);
+  const parseRange = (r: string): [number, number] => {
+    const [min, max] = r.split("~").map(Number);
+    return [min, max];
+  };
+  const [myMin, myMax] = parseRange(my.ageRange);
+  const [thMin, thMax] = parseRange(their.ageRange);
+  const ageScore = Math.max(myMin, thMin) <= Math.min(myMax, thMax) ? 1.0 : 0.0;
+
+  return sizeScore * 0.5 + ageScore * 0.5;
 }
 
 function scoreToLabel(score: number): MatchResult["label"] {
@@ -78,38 +46,33 @@ function generateReasons(
   my: TeamProfile,
   their: TeamProfile,
   vibeRaw: number,
-  traitRaw: number,
   roleRaw: number,
   condRaw: number
 ): string[] {
   const reasons: string[] = [];
 
-  if (vibeRaw >= 0.75) {
-    reasons.push(`${MOOD_LABELS[my.mood]} 분위기에서 자연스럽게 이어질 가능성이 높아요.`);
-  } else {
-    reasons.push(`${MOOD_LABELS[their.mood]} 성향이 더해져 새로운 대화 흐름이 예상돼요.`);
-  }
-
-  if (traitRaw >= 0.75) {
-    reasons.push("팀 성향 평균이 비슷해서 대화 속도와 배려 방식에서 잘 맞을 수 있어요.");
-  } else if (traitRaw >= 0.5) {
-    reasons.push("서로 다른 성향이 있어 역할을 나누면 균형 잡힌 분위기가 예상돼요.");
+  if (vibeRaw >= 0.8) {
+    reasons.push(`두 팀 모두 ${MOOD_LABELS[my.mood]} 분위기를 선호해요.`);
+  } else if (vibeRaw >= 0.5) {
+    reasons.push(
+      `${MOOD_LABELS[their.mood]}인 상대팀이 여러분의 분위기에 잘 맞춰줄 수 있어요.`
+    );
   }
 
   if (roleRaw >= 0.7) {
-    reasons.push("분위기 메이커와 조율자 역할이 섞여 만남 진행에서 잘 맞을 수 있어요.");
-  } else if (roleRaw < 0.45) {
-    reasons.push("역할 구성이 비슷해서 초반 진행 방식은 미리 맞춰보면 좋아요.");
+    reasons.push("두 팀의 역할 구성이 서로를 잘 보완해요.");
+  } else if (roleRaw >= 0.5) {
+    reasons.push("상대팀이 초반 어색함을 줄여줄 수 있는 역할을 갖고 있어요.");
   }
 
   if (condRaw >= 0.75) {
-    reasons.push("인원과 나이대 조건이 가까워 만남을 잡기 쉬울 가능성이 높아요.");
-  } else if (reasons.length < 3) {
-    reasons.push("조건 일부는 다르지만 분위기 조율로 편한 만남이 예상돼요.");
+    reasons.push("팀 인원과 나이대가 비슷해 편안한 만남이 될 거예요.");
+  } else if (my.size === their.size) {
+    reasons.push("팀 인원이 같아서 자리 구성이 자연스러워요.");
   }
 
-  while (reasons.length < 2) {
-    reasons.push("첫 대화 주제만 가볍게 맞추면 무리 없는 분위기가 예상돼요.");
+  if (reasons.length < 2) {
+    reasons.push("두 팀이 가볍고 부담 없는 만남을 만들 수 있어요.");
   }
 
   return reasons.slice(0, 3);
@@ -120,21 +83,26 @@ export function calculateMatchScore(
   candidate: TeamProfile
 ): MatchResult {
   const vibeRaw = calcVibeScore(myTeam.mood, candidate.mood);
-  const traitRaw = traitSimilarityScore(myTeam, candidate);
-  const roleRaw = calcRoleScore(myTeam, candidate);
+  const roleRaw = calcRoleBalanceScore(myTeam, candidate);
   const condRaw = calcConditionScore(myTeam, candidate);
-  const score = clampScore(vibeRaw * 40 + traitRaw * 35 + condRaw * 25);
+  const score = Math.round(vibeRaw * 40 + roleRaw * 35 + condRaw * 25);
 
   return {
-    team: candidate,
+    team:           candidate,
     score,
-    vibeScore: clampScore(vibeRaw * 100),
-    traitScore: clampScore(traitRaw * 100),
-    roleScore: clampScore(roleRaw * 100),
-    conditionScore: clampScore(condRaw * 100),
-    reasons: generateReasons(myTeam, candidate, vibeRaw, traitRaw, roleRaw, condRaw),
-    label: scoreToLabel(score),
+    vibeScore:      Math.round(vibeRaw * 100),
+    roleScore:      Math.round(roleRaw * 100),
+    conditionScore: Math.round(condRaw * 100),
+    reasons:        generateReasons(myTeam, candidate, vibeRaw, roleRaw, condRaw),
+    label:          scoreToLabel(score),
   };
+}
+
+export function isGenderCompatible(teamA: TeamProfile, teamB: TeamProfile): boolean {
+  if (teamA.maleCount === undefined || teamB.maleCount === undefined) return true;
+  const totalMale = teamA.maleCount + teamB.maleCount;
+  const totalFemale = (teamA.femaleCount ?? 0) + (teamB.femaleCount ?? 0);
+  return totalMale === totalFemale;
 }
 
 export function rankTeams(
@@ -142,6 +110,7 @@ export function rankTeams(
   candidates: TeamProfile[]
 ): MatchResult[] {
   return candidates
-    .map((candidate) => calculateMatchScore(myTeam, candidate))
+    .filter((c) => isGenderCompatible(myTeam, c))
+    .map((c) => calculateMatchScore(myTeam, c))
     .sort((a, b) => b.score - a.score);
 }
